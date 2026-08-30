@@ -6,19 +6,29 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView {
+            NavigationStack {
+                FridgeView()
+            }
+            .tabItem {
+                Label("Fridge", systemImage: "wineglass")
+            }
+
+            NavigationStack {
+                InventoryListView()
+            }
+            .tabItem {
+                Label("Inventory", systemImage: "list.bullet")
+            }
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(for: [Bottle.self, Shelf.self], inMemory: true)
 }

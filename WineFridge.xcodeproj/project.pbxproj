@@ -29,9 +29,22 @@
 		AEF8F4AA30430A8700FFCF4D /* WineFridgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WineFridgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AE8D03373044A4E1000C11DD /* Exceptions for "WineFridge" folder in "WineFridge" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AEF8F49230430A8600FFCF4D /* WineFridge */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AEF8F49530430A8600FFCF4D /* WineFridge */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AE8D03373044A4E1000C11DD /* Exceptions for "WineFridge" folder in "WineFridge" target */,
+			);
 			path = WineFridge;
 			sourceTree = "<group>";
 		};
@@ -171,7 +184,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2630;
-				LastUpgradeCheck = 2630;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					AEF8F49230430A8600FFCF4D = {
 						CreatedOnToolsVersion = 26.3;
@@ -328,6 +341,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -385,6 +399,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -400,6 +415,8 @@
 				DEVELOPMENT_TEAM = SQS7G5YJR3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WineFridge/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "WineFridge uses the camera to take a photo of a bottle's label for your inventory.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -432,6 +449,8 @@
 				DEVELOPMENT_TEAM = SQS7G5YJR3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WineFridge/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "WineFridge uses the camera to take a photo of a bottle's label for your inventory.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
