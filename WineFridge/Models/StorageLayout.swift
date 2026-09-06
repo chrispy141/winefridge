@@ -1,5 +1,5 @@
 //
-//  FridgeLayout.swift
+//  StorageLayout.swift
 //  WineFridge
 //
 
@@ -17,29 +17,33 @@ nonisolated struct SlotID: Hashable, Identifiable, Codable {
 
 nonisolated extension SlotID: Transferable {
     static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .wineFridgeSlot)
+        CodableRepresentation(contentType: .wineStorageSlot)
     }
 }
 
 nonisolated extension UTType {
-    static var wineFridgeSlot: UTType {
-        UTType(exportedAs: "com.winefridge.slotid")
+    static var wineStorageSlot: UTType {
+        UTType(exportedAs: "com.winestorage.slotid")
     }
 }
 
-/// A quick way to set both `rowCount` and `slotsPerRow` on a shelf at once.
+/// A quick way to set a shelf's `rowSlotCounts` all at once.
 struct ShelfLayoutPreset: Identifiable {
     let name: String
-    let rowCount: Int
-    let slotsPerRow: Int
+    let rowSlotCounts: [Int]
+    /// Whether rows should nest via the half-width offset. Pyramid layouts
+    /// already taper via their differing row counts, so they leave this off
+    /// to avoid double-offsetting.
+    let isOffsetRows: Bool
 
     var id: String { name }
 
     static let all: [ShelfLayoutPreset] = [
-        ShelfLayoutPreset(name: "Single Row · 4", rowCount: 1, slotsPerRow: 4),
-        ShelfLayoutPreset(name: "Single Row · 6", rowCount: 1, slotsPerRow: 6),
-        ShelfLayoutPreset(name: "Double Row · 4 per row", rowCount: 2, slotsPerRow: 4),
-        ShelfLayoutPreset(name: "Double Row · 6 per row", rowCount: 2, slotsPerRow: 6),
+        ShelfLayoutPreset(name: "Single Row · 4", rowSlotCounts: [4], isOffsetRows: true),
+        ShelfLayoutPreset(name: "Single Row · 6", rowSlotCounts: [6], isOffsetRows: true),
+        ShelfLayoutPreset(name: "Double Row · 4 per row", rowSlotCounts: [4, 4], isOffsetRows: true),
+        ShelfLayoutPreset(name: "Double Row · 6 per row", rowSlotCounts: [6, 6], isOffsetRows: true),
+        ShelfLayoutPreset(name: "Pyramid · 6-5-4", rowSlotCounts: [6, 5, 4], isOffsetRows: false),
     ]
 }
 

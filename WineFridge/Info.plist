@@ -10,9 +10,26 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>WineFridge Slot ID</string>
+			<string>Wine Storage Slot ID</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.winefridge.slotid</string>
+			<string>com.winestorage.slotid</string>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Wine Storage Backup</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.winestorage.backup</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>winestoragebackup</string>
+				</array>
+			</dict>
 		</dict>
 	</array>
 </dict>

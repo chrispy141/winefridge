@@ -6,6 +6,7 @@
 //
 
 import XCTest
+import SwiftData
 @testable import WineFridge
 
 final class WineFridgeTests: XCTestCase {
@@ -33,4 +34,79 @@ final class WineFridgeTests: XCTestCase {
         }
     }
 
+}
+
+/// Enabling CloudKit sync requires every stored `@Model` property to be
+/// optional or have a default value. These tests exercise that every model
+/// still round-trips correctly through a `ModelContext` when relying on
+/// those defaults, so a regression here would show up before it reaches
+/// CloudKit's schema validation.
+@MainActor
+final class PersistenceTests: XCTestCase {
+    private var container: ModelContainer!
+    private var context: ModelContext!
+
+    override func setUpWithError() throws {
+        container = try ModelContainer(
+            for: Storage.self, Bottle.self, Shelf.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        context = container.mainContext
+    }
+
+    override func tearDownWithError() throws {
+        container = nil
+        context = nil
+    }
+
+    func testBottleSurvivesRoundTripUsingSchemaDefaults() throws {
+        // Only `name` is provided; every other stored property must fall
+        // back to its schema-level default rather than crash or decode to
+        // garbage, since CloudKit can omit fields when merging records.
+        let bottle = Bottle(name: "Barolo")
+        context.insert(bottle)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<Bottle>())
+        XCTAssertEqual(fetched.count, 1)
+        let saved = fetched[0]
+        XCTAssertEqual(saved.name, "Barolo")
+        XCTAssertEqual(saved.producer, "")
+        XCTAssertEqual(saved.wineType, .red)
+        XCTAssertNil(saved.vintage)
+        XCTAssertEqual(saved.region, "")
+        XCTAssertEqual(saved.notes, "")
+        XCTAssertNil(saved.slot)
+    }
+
+    func testStorageAndShelfSurviveRoundTripUsingSchemaDefaults() throws {
+        let storage = Storage(name: "Cellar", position: 0)
+        context.insert(storage)
+        Shelf.seedDefaults(in: context, storageID: storage.storageID)
+        try context.save()
+
+        let storages = try context.fetch(FetchDescriptor<Storage>())
+        XCTAssertEqual(storages.count, 1)
+        XCTAssertEqual(storages[0].displayIcon, .tall)
+
+        let shelves = try context.fetch(FetchDescriptor<Shelf>())
+        XCTAssertEqual(shelves.count, 7)
+        XCTAssertTrue(shelves.allSatisfy { $0.storageID == storage.storageID })
+    }
+
+    func testBottleSlotAssignmentRoundTrips() throws {
+        let storage = Storage(name: "Cellar", position: 0)
+        let shelf = Shelf(position: 0, storageID: storage.storageID)
+        let bottle = Bottle(name: "Chablis", slot: SlotID(shelfID: shelf.shelfID, row: 1, column: 2))
+        context.insert(storage)
+        context.insert(shelf)
+        context.insert(bottle)
+        try context.save()
+
+        let fetched = try XCTUnwrap(try context.fetch(FetchDescriptor<Bottle>()).first)
+        XCTAssertEqual(fetched.slot, SlotID(shelfID: shelf.shelfID, row: 1, column: 2))
+
+        fetched.clearSlot()
+        XCTAssertNil(fetched.slot)
+    }
 }

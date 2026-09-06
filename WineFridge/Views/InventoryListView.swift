@@ -9,8 +9,9 @@ import UIKit
 
 struct InventoryListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Storage.position) private var storages: [Storage]
     @Query(sort: \Bottle.name) private var bottles: [Bottle]
-    @Query(sort: \Shelf.position) private var shelves: [Shelf]
+    @Query private var shelves: [Shelf]
     @State private var searchText = ""
     @State private var selectedBottle: Bottle?
     @State private var isAddingBottle = false
@@ -74,7 +75,22 @@ struct InventoryListView: View {
         }
     }
 
+    /// A bottle has no storage unit of its own — its storage unit (if any)
+    /// is derived from whichever shelf it's currently placed on. Unplaced
+    /// bottles are shared, storage-agnostic inventory.
     private func locationDescription(for bottle: Bottle) -> String {
-        SlotID.locationDescription(for: bottle.slot, shelves: shelves)
+        guard let slot = bottle.slot, let shelf = shelves.first(where: { $0.shelfID == slot.shelfID }) else {
+            return "Unassigned"
+        }
+        let storageName = storages.first(where: { $0.storageID == shelf.storageID })?.name ?? "Wine Storage"
+        let storageShelves = shelves.filter { $0.storageID == shelf.storageID }
+        return "\(storageName) — \(SlotID.locationDescription(for: slot, shelves: storageShelves))"
     }
+}
+
+#Preview {
+    NavigationStack {
+        InventoryListView()
+    }
+    .modelContainer(for: [Storage.self, Bottle.self, Shelf.self], inMemory: true)
 }

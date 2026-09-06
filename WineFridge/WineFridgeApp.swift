@@ -10,10 +10,15 @@ import SwiftData
 
 @main
 struct WineFridgeApp: App {
+    let container: ModelContainer = {
+        let configuration = ModelConfiguration(cloudKitDatabase: .none)
+        return try! ModelContainer(for: Storage.self, Bottle.self, Shelf.self, configurations: configuration)
+    }()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [Bottle.self, Shelf.self])
+        .modelContainer(container)
     }
 }

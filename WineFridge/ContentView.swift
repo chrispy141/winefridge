@@ -12,10 +12,10 @@ struct ContentView: View {
     var body: some View {
         TabView {
             NavigationStack {
-                FridgeView()
+                StorageListView()
             }
             .tabItem {
-                Label("Fridge", systemImage: "wineglass")
+                Label("Storage", systemImage: "wineglass")
             }
 
             NavigationStack {
@@ -24,11 +24,18 @@ struct ContentView: View {
             .tabItem {
                 Label("Inventory", systemImage: "list.bullet")
             }
+
+            NavigationStack {
+                BackupRestoreView()
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape")
+            }
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Bottle.self, Shelf.self], inMemory: true)
+        .modelContainer(for: [Storage.self, Bottle.self, Shelf.self], inMemory: true)
 }

@@ -1,27 +1,39 @@
 //
-//  FridgeView.swift
+//  StorageView.swift
 //  WineFridge
 //
 
 import SwiftUI
 import SwiftData
 
-struct FridgeView: View {
+struct StorageView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Shelf.position) private var shelves: [Shelf]
-    @Query private var bottles: [Bottle]
+    @Bindable var storage: Storage
+    @Query private var shelves: [Shelf]
+    /// All bottles, unfiltered — a bottle has no storage unit of its own, so
+    /// the bottles that belong on this storage unit's shelves are derived
+    /// from which shelf (if any) each bottle is placed on, not a stored
+    /// storage id.
+    @Query private var allBottles: [Bottle]
     @State private var selectedBottle: Bottle?
     @State private var newBottleSlot: SlotID?
-    @State private var isShowingEditFridge = false
-    @AppStorage("fridgeName") private var fridgeName = "Wine Fridge"
+    @State private var isShowingEditStorage = false
+
+    init(storage: Storage) {
+        self.storage = storage
+        let storageID = storage.storageID
+        _shelves = Query(filter: #Predicate<Shelf> { $0.storageID == storageID }, sort: \Shelf.position)
+    }
 
     private var displayName: String {
-        fridgeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Wine Fridge" : fridgeName
+        storage.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Wine Storage" : storage.name
     }
 
     private var bottlesBySlot: [SlotID: Bottle] {
-        Dictionary(uniqueKeysWithValues: bottles.compactMap { bottle in
-            bottle.slot.map { ($0, bottle) }
+        let shelfIDs = Set(shelves.map(\.shelfID))
+        return Dictionary(uniqueKeysWithValues: allBottles.compactMap { bottle in
+            guard let slot = bottle.slot, shelfIDs.contains(slot.shelfID) else { return nil }
+            return (slot, bottle)
         })
     }
 
@@ -46,7 +58,7 @@ struct FridgeView: View {
         .navigationTitle(displayName)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit Fridge") { isShowingEditFridge = true }
+                Button("Edit Storage") { isShowingEditStorage = true }
             }
         }
         .sheet(item: $selectedBottle) { bottle in
@@ -55,12 +67,12 @@ struct FridgeView: View {
         .sheet(item: $newBottleSlot) { slot in
             SlotPickerView(slot: slot)
         }
-        .sheet(isPresented: $isShowingEditFridge) {
-            EditFridgeView()
+        .sheet(isPresented: $isShowingEditStorage) {
+            EditStorageView(storage: storage)
         }
         .task {
             if shelves.isEmpty {
-                Shelf.seedDefaults(in: modelContext)
+                Shelf.seedDefaults(in: modelContext, storageID: storage.storageID)
             }
         }
     }
@@ -86,7 +98,7 @@ struct FridgeView: View {
 
 #Preview {
     NavigationStack {
-        FridgeView()
+        StorageView(storage: Storage(name: "Wine Storage", position: 0))
     }
-    .modelContainer(for: [Bottle.self, Shelf.self], inMemory: true)
+    .modelContainer(for: [Storage.self, Bottle.self, Shelf.self], inMemory: true)
 }

@@ -10,7 +10,8 @@ import UIKit
 
 /// Add or edit a bottle. Use `init(newBottleSlot:)` to create a bottle — pass
 /// a slot to place it directly on a shelf, or `nil` to leave it unplaced in
-/// inventory — or `init(editing:)` to edit an existing bottle in place.
+/// the shared, storage-agnostic inventory — or `init(editing:)` to edit an
+/// existing bottle in place.
 struct BottleFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

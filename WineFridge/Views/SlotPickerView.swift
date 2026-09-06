@@ -11,9 +11,8 @@ import UIKit
 /// existing unplaced bottle from inventory into the slot, or create a new one.
 struct SlotPickerView: View {
     @Environment(\.dismiss) private var dismiss
-    @Query private var bottles: [Bottle]
-
     let slot: SlotID
+    @Query private var bottles: [Bottle]
 
     @State private var searchText = ""
     @State private var isAddingNewBottle = false
