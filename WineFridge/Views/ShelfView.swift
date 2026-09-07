@@ -19,7 +19,7 @@ struct ShelfView: View {
     let onSelectSlot: (SlotID) -> Void
     let onMoveBottle: (SlotID, SlotID) -> Void
 
-    private let spacing: CGFloat = 18
+    private let spacing: CGFloat = 26
     private let containerPadding: CGFloat = 12
 
     private var maxSlotsPerRow: Int { shelf.rowSlotCounts.max() ?? 0 }
@@ -47,7 +47,7 @@ struct ShelfView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            VStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(shelf.rowSlotCounts.enumerated()), id: \.offset) { rowIndex, count in
                     row(rowIndex: rowIndex, count: count)
                 }

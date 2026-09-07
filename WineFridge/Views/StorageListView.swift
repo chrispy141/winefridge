@@ -52,7 +52,8 @@ struct StorageListView: View {
             }
             .padding()
         }
-        .navigationTitle("My Storage")
+        .navigationTitle("Wine Storage")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
