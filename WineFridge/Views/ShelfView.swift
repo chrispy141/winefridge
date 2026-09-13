@@ -6,8 +6,8 @@
 import SwiftUI
 
 /// A single shelf. Rows can hold different numbers of bottles — each row is
-/// centered relative to the widest row, so e.g. a shelf with rows of 6, 5,
-/// then 4 bottles tapers into a pyramid where bottles nest between the ones
+/// centered relative to the widest row, so e.g. a shelf with rows of 3, 4,
+/// then 5 bottles tapers into a pyramid where bottles nest between the ones
 /// in the row below. Separately, if `shelf.isOffsetRows` is on, every row but
 /// the bottommost is nudged right by half a bottle width so same-width rows
 /// nest in a classic staggered wine-rack pattern.
@@ -16,6 +16,7 @@ struct ShelfView: View {
     let shelfNumber: Int
     let bottlesBySlot: [SlotID: Bottle]
     let availableWidth: CGFloat
+    let zoomLevel: CGFloat
     let onSelectSlot: (SlotID) -> Void
     let onMoveBottle: (SlotID, SlotID) -> Void
 
@@ -29,16 +30,21 @@ struct ShelfView: View {
     private var isOffsetting: Bool { shelf.isOffsetRows && shelf.rowCount > 1 }
 
     /// The cell size that makes the widest row fill the available width
-    /// exactly, reserving an extra half cell of room when rows are offset so
-    /// the nested rows don't overflow.
+    /// exactly at zoom level 1, reserving an extra half cell of room when
+    /// rows are offset so the nested rows don't overflow. Zooming in/out
+    /// scales this up or down; when it no longer fits `availableWidth`, the
+    /// shelf scrolls horizontally instead of clipping.
     private var cellSize: CGFloat {
         let n = CGFloat(maxSlotsPerRow)
         guard n > 0 else { return 0 }
         let width = max(availableWidth - containerPadding * 2, 0)
+        let baseSize: CGFloat
         if isOffsetting {
-            return max((width - spacing * (n - 0.5)) / (n + 0.5), 0)
+            baseSize = max((width - spacing * (n - 0.5)) / (n + 0.5), 0)
+        } else {
+            baseSize = max((width - spacing * (n - 1)) / n, 0)
         }
-        return max((width - spacing * (n - 1)) / n, 0)
+        return baseSize * zoomLevel
     }
 
     var body: some View {
@@ -47,17 +53,19 @@ struct ShelfView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(shelf.rowSlotCounts.enumerated()), id: \.offset) { rowIndex, count in
-                    row(rowIndex: rowIndex, count: count)
+            ScrollView(.horizontal, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(shelf.rowSlotCounts.enumerated()), id: \.offset) { rowIndex, count in
+                        row(rowIndex: rowIndex, count: count)
+                    }
                 }
+                .padding(containerPadding)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.brown.opacity(0.15))
+                )
+                .frame(minWidth: availableWidth, alignment: .center)
             }
-            .padding(containerPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.brown.opacity(0.15))
-            )
         }
     }
 

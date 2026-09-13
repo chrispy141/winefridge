@@ -43,7 +43,7 @@ struct ShelfLayoutPreset: Identifiable {
         ShelfLayoutPreset(name: "Single Row · 6", rowSlotCounts: [6], isOffsetRows: true),
         ShelfLayoutPreset(name: "Double Row · 4 per row", rowSlotCounts: [4, 4], isOffsetRows: true),
         ShelfLayoutPreset(name: "Double Row · 6 per row", rowSlotCounts: [6, 6], isOffsetRows: true),
-        ShelfLayoutPreset(name: "Pyramid · 6-5-4", rowSlotCounts: [6, 5, 4], isOffsetRows: false),
+        ShelfLayoutPreset(name: "Pyramid · 3-4-5", rowSlotCounts: [3, 4, 5], isOffsetRows: false),
     ]
 }
 

@@ -50,6 +50,7 @@ struct StorageListView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding()
         }
         .navigationTitle("Wine Storage")

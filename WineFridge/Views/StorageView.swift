@@ -18,6 +18,10 @@ struct StorageView: View {
     @State private var selectedBottle: Bottle?
     @State private var newBottleSlot: SlotID?
     @State private var isShowingEditStorage = false
+    @AppStorage("bottleZoomLevel") private var zoomLevel: Double = 1.0
+
+    private let zoomRange: ClosedRange<Double> = 0.6...1.8
+    private let zoomStep: Double = 0.2
 
     init(storage: Storage) {
         self.storage = storage
@@ -47,6 +51,7 @@ struct StorageView: View {
                             shelfNumber: index + 1,
                             bottlesBySlot: bottlesBySlot,
                             availableWidth: geometry.size.width - 32,
+                            zoomLevel: zoomLevel,
                             onSelectSlot: handleSelect,
                             onMoveBottle: handleMove
                         )
@@ -57,6 +62,23 @@ struct StorageView: View {
         }
         .navigationTitle(displayName)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ControlGroup {
+                    Button {
+                        zoomLevel = max(zoomRange.lowerBound, zoomLevel - zoomStep)
+                    } label: {
+                        Label("Zoom Out", systemImage: "minus.magnifyingglass")
+                    }
+                    .disabled(zoomLevel <= zoomRange.lowerBound)
+
+                    Button {
+                        zoomLevel = min(zoomRange.upperBound, zoomLevel + zoomStep)
+                    } label: {
+                        Label("Zoom In", systemImage: "plus.magnifyingglass")
+                    }
+                    .disabled(zoomLevel >= zoomRange.upperBound)
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button("Edit Storage") { isShowingEditStorage = true }
             }

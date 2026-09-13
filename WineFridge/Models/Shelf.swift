@@ -18,7 +18,7 @@ final class Shelf {
     var shelfID: UUID = UUID()
     /// Number of bottle slots in each row, ordered front-to-back. Always has
     /// at least one row; rows may hold different numbers of bottles (e.g.
-    /// `[6, 5, 4]` for a pyramid-style rack).
+    /// `[3, 4, 5]` for a pyramid-style rack).
     var rowSlotCounts: [Int] = [4, 4]
     /// The `Storage.storageID` of the storage unit this shelf belongs to.
     /// Defaulted so SwiftData can lightweight-migrate stores predating this field.
