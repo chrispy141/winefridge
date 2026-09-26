@@ -30,7 +30,7 @@ struct StorageListView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                ForEach(rows, id: \.self) { row in
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack(spacing: 16) {
                         Spacer()
                         ForEach(row) { storage in
