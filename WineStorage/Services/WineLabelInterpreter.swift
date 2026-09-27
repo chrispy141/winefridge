@@ -3,6 +3,7 @@
 //  WineStorage
 //
 
+import Foundation
 import FoundationModels
 
 /// Interprets OCR text recognized from a wine label using Apple's on-device
@@ -111,21 +112,69 @@ struct WineLabelInterpreter {
         // wins.
         let isNonVintage = vintage == nil ? info.isNonVintage : false
 
+        // The model sometimes emits `0` for `abv` instead of leaving it
+        // blank when no percentage is printed, and can't produce a
+        // negative or absurdly high percentage from real label text —
+        // treat any such value as "no ABV" rather than a literal reading.
+        let abv = info.abv.flatMap { $0 > 0 && $0 < 100 ? $0 : nil }
+
         return WineLabelExtraction(
-            producer: info.producer,
-            wineName: info.wineName,
-            designation: info.designation,
-            varietal: info.varietal,
+            producer: titleCased(info.producer),
+            wineName: titleCased(info.wineName),
+            designation: titleCased(info.designation),
+            varietal: titleCased(info.varietal),
             wineType: info.wineType.flatMap(WineType.init(rawValue:)),
             vintage: vintage,
             isNonVintage: isNonVintage,
-            country: info.country,
-            region: info.region,
-            appellation: info.appellation,
-            vineyard: info.vineyard,
+            country: titleCased(info.country),
+            region: titleCased(info.region),
+            appellation: titleCased(info.appellation),
+            vineyard: titleCased(info.vineyard),
             bottleSize: info.bottleSizeMilliliters.flatMap(bottleSize(forMilliliters:)),
-            abv: info.abv
+            abv: abv
         )
+    }
+
+    /// Words that stay lowercase in title case unless they lead the string,
+    /// e.g. "Château Val de Vie" or "Château du Tertre".
+    private static let lowercaseConnectors: Set<String> = [
+        "de", "du", "des", "la", "le", "les", "di", "del", "della", "dei",
+        "y", "et", "and", "of", "the", "in", "sur", "van", "von", "der",
+        "da", "do", "das", "dos"
+    ]
+
+    /// Recognized abbreviations that should stay fully uppercase rather
+    /// than being title-cased, e.g. "Barolo DOCG" or "Pauillac AOC".
+    private static let preservedAcronyms: Set<String> = [
+        "AVA", "AOC", "AOP", "DOC", "DOCG", "IGT", "IGP", "VDP", "QBA",
+        "AC", "VDQS", "DO", "DOP", "NV"
+    ]
+
+    /// Normalizes label text pulled from OCR — which is often printed in
+    /// all caps on the label itself — into standard title case, so the form
+    /// doesn't get pre-filled with shouted-looking text.
+    private static func titleCased(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trimmed }
+        return trimmed
+            .split(separator: " ", omittingEmptySubsequences: false)
+            .enumerated()
+            .map { index, word in titleCasedWord(String(word), isFirst: index == 0) }
+            .joined(separator: " ")
+    }
+
+    private static func titleCasedWord(_ word: String, isFirst: Bool) -> String {
+        guard !word.isEmpty else { return word }
+        let upper = word.uppercased()
+        if preservedAcronyms.contains(upper) {
+            return upper
+        }
+        let lower = word.lowercased()
+        if !isFirst && lowercaseConnectors.contains(lower) {
+            return lower
+        }
+        return lower.prefix(1).uppercased() + lower.dropFirst()
     }
 
     private static nonisolated func bottleSize(forMilliliters milliliters: Int) -> BottleSize? {

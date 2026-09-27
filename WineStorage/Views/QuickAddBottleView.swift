@@ -108,7 +108,7 @@ struct QuickAddBottleView: View {
             }
             .ignoresSafeArea()
         }
-        .fullScreenCover(item: $reviewContext, onDismiss: reviewDismissed) { context in
+        .sheet(item: $reviewContext, onDismiss: reviewDismissed) { context in
             BottleFormView(
                 initialPhotoData: context.photoData,
                 prefilledExtraction: context.extraction,

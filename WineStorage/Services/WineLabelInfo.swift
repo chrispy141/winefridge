@@ -49,6 +49,6 @@ struct WineLabelInfo {
     @Guide(description: "The bottle size in milliliters, only if it's explicitly printed on the label, e.g. 750, 375, 1500, or 3000. Leave blank if it isn't stated.")
     var bottleSizeMilliliters: Int?
 
-    @Guide(description: "The alcohol by volume percentage, but only if a specific number is printed on the label (typically next to 'ALC', 'ALC/VOL', or a '%' sign), e.g. 14.8. Never estimate or fill in a typical percentage for the wine's style, grape, or region. Leave blank if no percentage is printed in the text.")
+    @Guide(description: "The alcohol by volume percentage. Only populate this if the label text contains an explicit number followed by a percent sign, e.g. 14.8%, such as next to 'ALC' or 'ALC/VOL'. Seeing 'ALC' or 'ALC/VOL' alone, with no attached number, is not enough — leave this blank in that case. Never estimate or fill in a typical percentage based on the wine's style, grape, producer, region, appellation, or vintage. Never default to 0. Leave blank if no explicit numeric percentage is printed in the text.")
     var abv: Double?
 }
