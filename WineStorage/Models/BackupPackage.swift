@@ -42,6 +42,9 @@ struct BackupPackage: Codable {
         var wineType: WineType
         var varietal: String?
         var vintage: Int?
+        /// Optional (rather than defaulted) so backups made before this field
+        /// existed still decode; `restore` treats a missing value as `false`.
+        var isNonVintage: Bool?
         var country: String?
         var region: String
         var appellation: String?
@@ -79,6 +82,7 @@ struct BackupPackage: Codable {
                 wineType: $0.wineType,
                 varietal: $0.varietal,
                 vintage: $0.vintage,
+                isNonVintage: $0.isNonVintage,
                 country: $0.country,
                 region: $0.region,
                 appellation: $0.appellation,
@@ -138,6 +142,7 @@ struct BackupPackage: Codable {
                 wineType: record.wineType,
                 varietal: record.varietal ?? "",
                 vintage: record.vintage,
+                isNonVintage: record.isNonVintage ?? false,
                 country: record.country ?? "",
                 region: record.region,
                 appellation: record.appellation ?? record.subregion ?? "",

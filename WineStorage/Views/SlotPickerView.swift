@@ -91,8 +91,8 @@ struct BottleRowLabel: View {
                 }
             }
             Spacer()
-            if let vintage = bottle.vintage {
-                Text(String(vintage))
+            if let vintageDisplayText = bottle.vintageDisplayText {
+                Text(vintageDisplayText)
                     .foregroundStyle(.secondary)
             }
         }

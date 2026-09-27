@@ -18,13 +18,22 @@ struct StorageView: View {
     @State private var selectedBottle: Bottle?
     @State private var newBottleSlot: SlotID?
     @State private var isShowingEditStorage = false
+    @State private var isShowingQuickAdd = false
+    @State private var pendingLocationSlot: SlotID?
     @AppStorage("bottleZoomLevel") private var zoomLevel: Double = 1.0
 
     private let zoomRange: ClosedRange<Double> = 0.6...1.8
     private let zoomStep: Double = 0.2
 
-    init(storage: Storage) {
+    /// When set, this view acts as Quick Add's "Choose Location" step:
+    /// occupied slots become unselectable, and tapping an empty slot (after
+    /// confirming) calls this instead of opening the normal add/detail
+    /// sheets. `nil` for ordinary browsing.
+    var slotSelectionHandler: ((SlotID) -> Void)? = nil
+
+    init(storage: Storage, slotSelectionHandler: ((SlotID) -> Void)? = nil) {
         self.storage = storage
+        self.slotSelectionHandler = slotSelectionHandler
         let storageID = storage.storageID
         _shelves = Query(filter: #Predicate<Shelf> { $0.storageID == storageID }, sort: \Shelf.position)
     }
@@ -53,7 +62,8 @@ struct StorageView: View {
                             availableWidth: geometry.size.width - 32,
                             zoomLevel: zoomLevel,
                             onSelectSlot: handleSelect,
-                            onMoveBottle: handleMove
+                            onMoveBottle: handleMove,
+                            selectedSlot: pendingLocationSlot
                         )
                     }
                 }
@@ -79,8 +89,17 @@ struct StorageView: View {
                     .disabled(zoomLevel >= zoomRange.upperBound)
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Edit Storage") { isShowingEditStorage = true }
+            if slotSelectionHandler == nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        isShowingQuickAdd = true
+                    } label: {
+                        Label("Quick Add", systemImage: "camera.badge.plus")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Edit Storage") { isShowingEditStorage = true }
+                }
             }
         }
         .sheet(item: $selectedBottle) { bottle in
@@ -92,14 +111,43 @@ struct StorageView: View {
         .sheet(isPresented: $isShowingEditStorage) {
             EditStorageView(storage: storage)
         }
+        .sheet(isPresented: $isShowingQuickAdd) {
+            QuickAddBottleView(storage: storage)
+                .interactiveDismissDisabled()
+        }
         .task {
             if shelves.isEmpty {
                 Shelf.seedDefaults(in: modelContext, storageID: storage.storageID)
             }
         }
+        .confirmationDialog(
+            "Place Bottle Here?",
+            isPresented: Binding(
+                get: { pendingLocationSlot != nil },
+                set: { if !$0 { pendingLocationSlot = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingLocationSlot
+        ) { slot in
+            Button("Place Bottle Here") {
+                slotSelectionHandler?(slot)
+                pendingLocationSlot = nil
+            }
+            Button("Cancel", role: .cancel) { pendingLocationSlot = nil }
+        } message: { slot in
+            Text(SlotID.locationDescription(for: slot, shelves: shelves))
+        }
     }
 
     private func handleSelect(_ slot: SlotID) {
+        if slotSelectionHandler != nil {
+            // Quick Add's "Choose Location" step: occupied slots aren't
+            // selectable destinations, and empty ones need confirming
+            // before committing.
+            guard bottlesBySlot[slot] == nil else { return }
+            pendingLocationSlot = slot
+            return
+        }
         if let bottle = bottlesBySlot[slot] {
             selectedBottle = bottle
         } else {

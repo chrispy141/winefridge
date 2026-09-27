@@ -8,10 +8,11 @@ import SwiftData
 import PhotosUI
 import UIKit
 
-/// Add or edit a bottle. Use `init(newBottleSlot:)` to create a bottle — pass
-/// a slot to place it directly on a shelf, or `nil` to leave it unplaced in
-/// the shared, storage-agnostic inventory — or `init(editing:)` to edit an
-/// existing bottle in place.
+/// Add or edit a bottle. Use `init(newBottleSlot:initialPhotoData:prefilledExtraction:onSave:)`
+/// to create a bottle — pass a slot to place it directly on a shelf, or
+/// `nil` to leave it unplaced in the shared, storage-agnostic inventory
+/// (e.g. Quick Add places the bottle itself once a location is chosen) —
+/// or `init(editing:)` to edit an existing bottle in place.
 struct BottleFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -19,12 +20,16 @@ struct BottleFormView: View {
 
     private let existingBottle: Bottle?
     private let slotForNewBottle: SlotID?
+    /// Called with the saved bottle right before the form dismisses itself,
+    /// so a caller like Quick Add — which needs the bottle to continue its
+    /// own flow (choosing where to place it) — doesn't have to re-derive it.
+    private let onSave: ((Bottle) -> Void)?
 
     @State private var name: String
     @State private var producer: String
     @State private var wineType: WineType
     @State private var varietal: String
-    @State private var vintageText: String
+    @State private var vintageSelection: Bottle.VintageSelection
     @State private var country: String
     @State private var region: String
     @State private var appellation: String
@@ -36,34 +41,66 @@ struct BottleFormView: View {
     @State private var photoData: Data?
     @State private var photosPickerItem: PhotosPickerItem?
     @State private var isShowingCamera = false
+    @State private var isShowingPhotoPicker = false
 
-    init(newBottleSlot slot: SlotID? = nil) {
+    @State private var isScanningLabel = false
+    @State private var labelScanAlert: LabelScanAlert?
+
+    /// - Parameters:
+    ///   - slot: Where to place the bottle once saved, or `nil` to leave it
+    ///     unplaced in the shared inventory (e.g. for Quick Add, which places
+    ///     the bottle itself once a location has been chosen).
+    ///   - initialPhotoData: A label photo to start the form with, such as
+    ///     the photo Quick Add just scanned.
+    ///   - extraction: Recognized label fields (see `WineLabelScanner`) to
+    ///     pre-populate the form with. Every field is still editable before
+    ///     saving — nothing here is committed until the person taps Save.
+    ///   - onSave: Called with the saved bottle right before the form
+    ///     dismisses, so a caller can continue its own flow with it.
+    init(
+        newBottleSlot slot: SlotID? = nil,
+        initialPhotoData: Data? = nil,
+        prefilledExtraction extraction: WineLabelExtraction? = nil,
+        onSave: ((Bottle) -> Void)? = nil
+    ) {
         existingBottle = nil
         slotForNewBottle = slot
-        _name = State(initialValue: "")
-        _producer = State(initialValue: "")
-        _wineType = State(initialValue: .red)
-        _varietal = State(initialValue: "")
-        _vintageText = State(initialValue: "")
-        _country = State(initialValue: "")
-        _region = State(initialValue: "")
-        _appellation = State(initialValue: "")
-        _vineyard = State(initialValue: "")
-        _designation = State(initialValue: "")
-        _bottleSize = State(initialValue: .standard)
-        _abvText = State(initialValue: "")
+        self.onSave = onSave
+        _name = State(initialValue: extraction?.wineName ?? "")
+        _producer = State(initialValue: extraction?.producer ?? "")
+        _wineType = State(initialValue: extraction?.wineType ?? .red)
+        _varietal = State(initialValue: extraction?.varietal ?? "")
+        // Positioned at the current year so someone adding a bottle doesn't
+        // need to scroll the wheel from 1800; Unknown and NV are still just
+        // a couple of rows away. A prefilled extraction's vintage overrides
+        // this the same way typing one in would.
+        if extraction?.isNonVintage == true {
+            _vintageSelection = State(initialValue: .nonVintage)
+        } else if let vintage = extraction?.vintage {
+            _vintageSelection = State(initialValue: .year(vintage))
+        } else {
+            _vintageSelection = State(initialValue: .year(Self.currentYear))
+        }
+        _country = State(initialValue: extraction?.country ?? "")
+        _region = State(initialValue: extraction?.region ?? "")
+        _appellation = State(initialValue: extraction?.appellation ?? "")
+        _vineyard = State(initialValue: extraction?.vineyard ?? "")
+        _designation = State(initialValue: extraction?.designation ?? "")
+        _bottleSize = State(initialValue: extraction?.bottleSize ?? .standard)
+        _abvText = State(initialValue: extraction?.abv.map { String($0) } ?? "")
         _notes = State(initialValue: "")
-        _photoData = State(initialValue: nil)
+        _photoData = State(initialValue: initialPhotoData)
     }
 
     init(editing bottle: Bottle) {
         existingBottle = bottle
         slotForNewBottle = nil
+        onSave = nil
         _name = State(initialValue: bottle.name)
         _producer = State(initialValue: bottle.producer)
         _wineType = State(initialValue: bottle.wineType)
         _varietal = State(initialValue: bottle.varietal)
-        _vintageText = State(initialValue: bottle.vintage.map(String.init) ?? "")
+        _vintageSelection = State(initialValue: bottle.vintageSelection)
         _country = State(initialValue: bottle.country)
         _region = State(initialValue: bottle.region)
         _appellation = State(initialValue: bottle.appellation)
@@ -94,35 +131,71 @@ struct BottleFormView: View {
                             photosPickerItem = nil
                         }
                     }
-                    PhotosPicker(selection: $photosPickerItem, matching: .images) {
-                        Label("Choose Photo", systemImage: "photo.on.rectangle")
-                    }
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                        Button {
-                            isShowingCamera = true
+                        Menu {
+                            Button {
+                                isShowingCamera = true
+                            } label: {
+                                Label("Take Photo", systemImage: "camera")
+                            }
+                            Button {
+                                isShowingPhotoPicker = true
+                            } label: {
+                                Label("Choose Photo", systemImage: "photo.on.rectangle")
+                            }
                         } label: {
-                            Label("Take Photo", systemImage: "camera")
+                            Label(photoData == nil ? "Add Photo" : "Change Photo", systemImage: "photo.badge.plus")
+                        }
+                    } else {
+                        Button {
+                            isShowingPhotoPicker = true
+                        } label: {
+                            Label(photoData == nil ? "Add Photo" : "Change Photo", systemImage: "photo.badge.plus")
                         }
                     }
+                    Button {
+                        startLabelScan()
+                    } label: {
+                        if isScanningLabel {
+                            Label {
+                                Text("Scanning Label…")
+                            } icon: {
+                                ProgressView()
+                            }
+                        } else {
+                            Label("Scan Wine Label", systemImage: "text.viewfinder")
+                        }
+                    }
+                    .disabled(isScanningLabel || photoData == nil)
                 }
                 Section("Wine") {
-                    AutocompleteTextField(label: "Producer (e.g. Stag’s Leap Wine Cellars)", text: $producer, suggestions: pastValues(\.producer))
-                    AutocompleteTextField(label: "Wine / Cuvée (e.g. CASK 23)", text: $name, suggestions: pastValues(\.name))
-                    AutocompleteTextField(label: "Varietal / Blend (e.g. Cabernet Sauvignon)", text: $varietal, suggestions: pastValues(\.varietal))
+                    AutocompleteTextField(title: "Producer", placeholder: "e.g. Stag’s Leap Wine Cellars", text: $producer, suggestions: pastValues(\.producer))
+                    AutocompleteTextField(title: "Wine / Cuvée", placeholder: "e.g. CASK 23", text: $name, suggestions: pastValues(\.name))
+                    AutocompleteTextField(title: "Varietal / Blend", placeholder: "e.g. Cabernet Sauvignon", text: $varietal, suggestions: pastValues(\.varietal))
                     Picker("Style", selection: $wineType) {
                         ForEach(WineType.allCases) { type in
                             Text(type.rawValue).tag(type)
                         }
                     }
-                    TextField("Vintage (e.g. 2022)", text: $vintageText)
-                        .keyboardType(.numberPad)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Vintage")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Picker("Vintage", selection: $vintageSelection) {
+                            ForEach(vintageOptions, id: \.self) { option in
+                                Text(vintageLabel(for: option)).tag(option)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.wheel)
+                    }
                 }
                 Section("Origin") {
-                    AutocompleteTextField(label: "Country (e.g. United States)", text: $country, suggestions: pastValues(\.country))
-                    AutocompleteTextField(label: "Region (e.g. Napa Valley)", text: $region, suggestions: pastValues(\.region))
-                    AutocompleteTextField(label: "Appellation (e.g. Stags Leap District)", text: $appellation, suggestions: pastValues(\.appellation))
-                    AutocompleteTextField(label: "Vineyard (e.g. S.L.V. & FAY Vineyards)", text: $vineyard, suggestions: pastValues(\.vineyard))
-                    AutocompleteTextField(label: "Designation / Tier (e.g. Estate)", text: $designation, suggestions: pastValues(\.designation))
+                    AutocompleteTextField(title: "Country", placeholder: "e.g. United States", text: $country, suggestions: pastValues(\.country))
+                    AutocompleteTextField(title: "Region", placeholder: "e.g. Napa Valley", text: $region, suggestions: pastValues(\.region))
+                    AutocompleteTextField(title: "Appellation", placeholder: "e.g. Stags Leap District", text: $appellation, suggestions: pastValues(\.appellation))
+                    AutocompleteTextField(title: "Vineyard", placeholder: "e.g. S.L.V. & FAY Vineyards", text: $vineyard, suggestions: pastValues(\.vineyard))
+                    AutocompleteTextField(title: "Designation / Tier", placeholder: "e.g. Estate", text: $designation, suggestions: pastValues(\.designation))
                 }
                 Section("Bottle") {
                     Picker("Bottle Size", selection: $bottleSize) {
@@ -130,16 +203,26 @@ struct BottleFormView: View {
                             Text(size.rawValue).tag(size)
                         }
                     }
-                    HStack {
-                        TextField("ABV (e.g. 14.8)", text: $abvText)
-                            .keyboardType(.decimalPad)
-                        Text("%")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("ABV")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
+                        HStack {
+                            TextField("e.g. 14.8", text: $abvText)
+                                .keyboardType(.decimalPad)
+                            Text("%")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Section("Notes") {
-                    TextField("Notes", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Notes")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("Notes", text: $notes, axis: .vertical)
+                            .lineLimit(3...6)
+                    }
                 }
             }
             .navigationTitle(existingBottle == nil ? "Add Bottle" : "Edit Bottle")
@@ -158,6 +241,7 @@ struct BottleFormView: View {
                     store(imageData: data)
                 }
             }
+            .photosPicker(isPresented: $isShowingPhotoPicker, selection: $photosPickerItem, matching: .images)
             .fullScreenCover(isPresented: $isShowingCamera) {
                 CameraCaptureView { image in
                     if let image {
@@ -167,6 +251,41 @@ struct BottleFormView: View {
                 }
                 .ignoresSafeArea()
             }
+            .alert(item: $labelScanAlert) { alert in
+                Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
+            }
+        }
+    }
+
+    private static let earliestVintageYear = 1800
+    private static var currentYear: Int {
+        Calendar.current.component(.year, from: .now)
+    }
+
+    /// All selectable vintage options, in wheel order: Unknown and NV first
+    /// — so they're reachable without scrolling through every year — then
+    /// years in descending order from this year back to `earliestVintageYear`.
+    /// If the bottle already has a legacy vintage outside that range, it's
+    /// included too, so editing it never silently discards the value.
+    private var vintageOptions: [Bottle.VintageSelection] {
+        var years = stride(from: Self.currentYear, through: Self.earliestVintageYear, by: -1)
+            .map(Bottle.VintageSelection.year)
+        if case .year(let legacyYear) = vintageSelection,
+           !(Self.earliestVintageYear...Self.currentYear).contains(legacyYear) {
+            if legacyYear > Self.currentYear {
+                years.insert(.year(legacyYear), at: 0)
+            } else {
+                years.append(.year(legacyYear))
+            }
+        }
+        return [.unknown, .nonVintage] + years
+    }
+
+    private func vintageLabel(for selection: Bottle.VintageSelection) -> String {
+        switch selection {
+        case .unknown: return "Unknown"
+        case .nonVintage: return "NV"
+        case .year(let year): return String(year)
         }
     }
 
@@ -187,15 +306,105 @@ struct BottleFormView: View {
         photoData = uiImage.resized(maxDimension: 1000).jpegData(compressionQuality: 0.8)
     }
 
+    /// Starts the "Scan Wine Label" flow by running OCR on the bottle's
+    /// currently assigned photo. The button that triggers this is disabled
+    /// when there's no photo, so scanning never needs to ask for one.
+    private func startLabelScan() {
+        guard let photoData, let image = UIImage(data: photoData) else { return }
+        runLabelScan(on: image)
+    }
+
+    /// Runs the on-device OCR + interpretation pipeline on a label photo and
+    /// applies the result to the form (see `apply(_:)` for the overwrite policy).
+    private func runLabelScan(on image: UIImage) {
+        isScanningLabel = true
+        Task {
+            defer { isScanningLabel = false }
+            do {
+                switch try await WineLabelScanner.scan(image: image) {
+                case .extracted(let extraction):
+                    apply(extraction)
+                case .interpreterUnavailable(let reason):
+                    labelScanAlert = LabelScanAlert(
+                        title: "Label Scanning Limited",
+                        message: reason
+                    )
+                }
+            } catch {
+                labelScanAlert = LabelScanAlert(
+                    title: "Couldn't Read Label",
+                    message: "Try a clearer, well-lit photo of the label with the text facing the camera."
+                )
+            }
+        }
+    }
+
+    /// Applies a label scan's results to the form.
+    ///
+    /// When adding a new bottle, this only fills in fields still blank —
+    /// it never overwrites something already typed. When editing an
+    /// existing bottle, scanning is an explicit request to refresh that
+    /// bottle's details from the label, so recognized fields do overwrite
+    /// the current values. Either way, nothing is saved until the person
+    /// reviews the form and taps Save.
+    private func apply(_ extraction: WineLabelExtraction) {
+        let overwritesExistingValues = existingBottle != nil
+
+        func apply(_ newValue: String?, to current: inout String) {
+            guard let newValue else { return }
+            if overwritesExistingValues || current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                current = newValue
+            }
+        }
+
+        apply(extraction.wineName, to: &name)
+        apply(extraction.producer, to: &producer)
+        apply(extraction.varietal, to: &varietal)
+        apply(extraction.designation, to: &designation)
+        apply(extraction.country, to: &country)
+        apply(extraction.region, to: &region)
+        apply(extraction.appellation, to: &appellation)
+        apply(extraction.vineyard, to: &vineyard)
+
+        // A new bottle's vintage starts on the current year purely so the
+        // wheel doesn't open scrolled away from today — that's not a
+        // deliberate choice the way typing a value into a text field is, so
+        // a scan is still free to override it exactly once, same as it
+        // would fill in any other still-blank field.
+        let untouchedNewBottleVintage = Bottle.VintageSelection.year(Self.currentYear)
+        if let isNonVintage = extraction.isNonVintage, isNonVintage {
+            if overwritesExistingValues || vintageSelection == untouchedNewBottleVintage {
+                vintageSelection = .nonVintage
+            }
+        } else if let vintage = extraction.vintage {
+            if overwritesExistingValues || vintageSelection == untouchedNewBottleVintage {
+                vintageSelection = .year(vintage)
+            }
+        }
+        if let abv = extraction.abv, overwritesExistingValues || abvText.isEmpty {
+            abvText = String(abv)
+        }
+        // `wineType` and `bottleSize` have no "blank" state of their own —
+        // when adding a bottle their current values are still the form's
+        // defaults until someone picks otherwise, and when editing,
+        // overwriting them is exactly what a rescan is for.
+        if let wineType = extraction.wineType {
+            self.wineType = wineType
+        }
+        if let bottleSize = extraction.bottleSize {
+            self.bottleSize = bottleSize
+        }
+    }
+
     private func save() {
-        let vintage = Int(vintageText)
         let abv = Double(abvText)
+        let savedBottle: Bottle
         if let bottle = existingBottle {
             bottle.name = name
             bottle.producer = producer
             bottle.wineType = wineType
             bottle.varietal = varietal
-            bottle.vintage = vintage
+            bottle.vintageSelection = vintageSelection
             bottle.country = country
             bottle.region = region
             bottle.appellation = appellation
@@ -205,13 +414,13 @@ struct BottleFormView: View {
             bottle.abv = abv
             bottle.notes = notes
             bottle.photoData = photoData
+            savedBottle = bottle
         } else {
             let bottle = Bottle(
                 name: name,
                 producer: producer,
                 wineType: wineType,
                 varietal: varietal,
-                vintage: vintage,
                 country: country,
                 region: region,
                 appellation: appellation,
@@ -223,8 +432,18 @@ struct BottleFormView: View {
                 slot: slotForNewBottle,
                 photoData: photoData
             )
+            bottle.vintageSelection = vintageSelection
             modelContext.insert(bottle)
+            savedBottle = bottle
         }
+        onSave?(savedBottle)
         dismiss()
     }
+}
+
+/// A simple message shown when label scanning can't fully complete.
+private struct LabelScanAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
 }

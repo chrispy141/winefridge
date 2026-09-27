@@ -41,8 +41,8 @@ struct BottleDetailView: View {
                         LabeledContent("Varietal / Blend", value: bottle.varietal)
                     }
                     LabeledContent("Style", value: bottle.wineType.rawValue)
-                    if let vintage = bottle.vintage {
-                        LabeledContent("Vintage", value: String(vintage))
+                    if let vintageDisplayText = bottle.vintageDisplayText {
+                        LabeledContent("Vintage", value: vintageDisplayText)
                     }
                     LabeledContent("Storage", value: storageName)
                     LabeledContent("Location", value: locationDescription)

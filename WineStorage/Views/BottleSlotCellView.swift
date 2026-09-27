@@ -10,6 +10,10 @@ struct BottleSlotCellView: View {
     let bottle: Bottle?
     var size: CGFloat = 52
     var height: CGFloat?
+    /// Highlights this cell as the slot currently pending confirmation, e.g.
+    /// while Quick Add's "Choose Location" step is waiting on a placement to
+    /// be confirmed.
+    var isSelected: Bool = false
 
     private var photoImage: UIImage? {
         bottle?.photoData.flatMap(UIImage.init(data:))
@@ -28,8 +32,13 @@ struct BottleSlotCellView: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(photoImage != nil ? (bottle?.wineType.color ?? .clear) : .black.opacity(0.15), lineWidth: photoImage != nil ? 2 : 1)
 
+            if isSelected {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.accentColor, lineWidth: 3)
+            }
+
             if let bottle {
-                let vintageText = Text(bottle.vintage.map(String.init) ?? "")
+                let vintageText = Text(bottle.vintageDisplayText ?? "")
                 if photoImage != nil {
                     VStack {
                         Spacer()

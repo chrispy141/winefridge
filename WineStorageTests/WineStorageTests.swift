@@ -7,7 +7,7 @@
 
 import XCTest
 import SwiftData
-@testable import WineStorage
+@testable import WineFridge
 
 final class WineStorageTests: XCTestCase {
 

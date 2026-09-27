@@ -18,6 +18,10 @@ final class Bottle {
     var wineType: WineType = WineType.red
     var varietal: String = ""
     var vintage: Int?
+    /// Whether this bottle is a deliberately non-vintage ("NV") wine, as
+    /// opposed to `vintage` simply being unknown. Never set alongside a
+    /// non-nil `vintage` — see `vintageSelection`, which enforces that.
+    var isNonVintage: Bool = false
     var country: String = ""
     var region: String = ""
     var appellation: String = ""
@@ -43,6 +47,7 @@ final class Bottle {
         wineType: WineType = .red,
         varietal: String = "",
         vintage: Int? = nil,
+        isNonVintage: Bool = false,
         country: String = "",
         region: String = "",
         appellation: String = "",
@@ -60,6 +65,7 @@ final class Bottle {
         self.wineType = wineType
         self.varietal = varietal
         self.vintage = vintage
+        self.isNonVintage = isNonVintage
         self.country = country
         self.region = region
         self.appellation = appellation
@@ -92,5 +98,50 @@ final class Bottle {
 
     func clearSlot() {
         slot = nil
+    }
+
+    /// A friendlier, exhaustive view of `vintage`/`isNonVintage` for UI code
+    /// (see the vintage picker in `BottleFormView`) that can't express the
+    /// invalid combination of both a year and `isNonVintage` being set.
+    enum VintageSelection: Hashable {
+        case unknown
+        case nonVintage
+        case year(Int)
+    }
+
+    var vintageSelection: VintageSelection {
+        get {
+            if isNonVintage {
+                return .nonVintage
+            }
+            if let vintage {
+                return .year(vintage)
+            }
+            return .unknown
+        }
+        set {
+            switch newValue {
+            case .unknown:
+                vintage = nil
+                isNonVintage = false
+            case .nonVintage:
+                vintage = nil
+                isNonVintage = true
+            case .year(let year):
+                vintage = year
+                isNonVintage = false
+            }
+        }
+    }
+
+    /// A short label for displaying the vintage, or `nil` when it's unknown
+    /// (matching how `vintage == nil` is already handled everywhere it's
+    /// displayed today).
+    var vintageDisplayText: String? {
+        switch vintageSelection {
+        case .unknown: return nil
+        case .nonVintage: return "NV"
+        case .year(let year): return String(year)
+        }
     }
 }
