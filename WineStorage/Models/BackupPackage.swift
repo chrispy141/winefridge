@@ -40,8 +40,19 @@ struct BackupPackage: Codable {
         var name: String
         var producer: String
         var wineType: WineType
+        var varietal: String?
         var vintage: Int?
+        var country: String?
         var region: String
+        var appellation: String?
+        /// Renamed from `subregion` in a later schema version; kept only so
+        /// backups written before the rename still decode. `restore` falls
+        /// back to this when `appellation` is missing.
+        var subregion: String?
+        var vineyard: String?
+        var designation: String?
+        var bottleSize: BottleSize?
+        var abv: Double?
         var notes: String
         var dateAdded: Date
         var slot: SlotID?
@@ -66,8 +77,15 @@ struct BackupPackage: Codable {
                 name: $0.name,
                 producer: $0.producer,
                 wineType: $0.wineType,
+                varietal: $0.varietal,
                 vintage: $0.vintage,
+                country: $0.country,
                 region: $0.region,
+                appellation: $0.appellation,
+                vineyard: $0.vineyard,
+                designation: $0.designation,
+                bottleSize: $0.bottleSize,
+                abv: $0.abv,
                 notes: $0.notes,
                 dateAdded: $0.dateAdded,
                 slot: $0.slot,
@@ -118,8 +136,15 @@ struct BackupPackage: Codable {
                 name: record.name,
                 producer: record.producer,
                 wineType: record.wineType,
+                varietal: record.varietal ?? "",
                 vintage: record.vintage,
+                country: record.country ?? "",
                 region: record.region,
+                appellation: record.appellation ?? record.subregion ?? "",
+                vineyard: record.vineyard ?? "",
+                designation: record.designation ?? "",
+                bottleSize: record.bottleSize ?? .standard,
+                abv: record.abv,
                 notes: record.notes,
                 dateAdded: record.dateAdded,
                 slot: record.slot,

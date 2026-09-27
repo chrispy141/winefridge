@@ -23,8 +23,15 @@ struct BottleFormView: View {
     @State private var name: String
     @State private var producer: String
     @State private var wineType: WineType
+    @State private var varietal: String
     @State private var vintageText: String
+    @State private var country: String
     @State private var region: String
+    @State private var appellation: String
+    @State private var vineyard: String
+    @State private var designation: String
+    @State private var bottleSize: BottleSize
+    @State private var abvText: String
     @State private var notes: String
     @State private var photoData: Data?
     @State private var photosPickerItem: PhotosPickerItem?
@@ -36,8 +43,15 @@ struct BottleFormView: View {
         _name = State(initialValue: "")
         _producer = State(initialValue: "")
         _wineType = State(initialValue: .red)
+        _varietal = State(initialValue: "")
         _vintageText = State(initialValue: "")
+        _country = State(initialValue: "")
         _region = State(initialValue: "")
+        _appellation = State(initialValue: "")
+        _vineyard = State(initialValue: "")
+        _designation = State(initialValue: "")
+        _bottleSize = State(initialValue: .standard)
+        _abvText = State(initialValue: "")
         _notes = State(initialValue: "")
         _photoData = State(initialValue: nil)
     }
@@ -48,8 +62,15 @@ struct BottleFormView: View {
         _name = State(initialValue: bottle.name)
         _producer = State(initialValue: bottle.producer)
         _wineType = State(initialValue: bottle.wineType)
+        _varietal = State(initialValue: bottle.varietal)
         _vintageText = State(initialValue: bottle.vintage.map(String.init) ?? "")
+        _country = State(initialValue: bottle.country)
         _region = State(initialValue: bottle.region)
+        _appellation = State(initialValue: bottle.appellation)
+        _vineyard = State(initialValue: bottle.vineyard)
+        _designation = State(initialValue: bottle.designation)
+        _bottleSize = State(initialValue: bottle.bottleSize)
+        _abvText = State(initialValue: bottle.abv.map { String($0) } ?? "")
         _notes = State(initialValue: bottle.notes)
         _photoData = State(initialValue: bottle.photoData)
     }
@@ -85,16 +106,36 @@ struct BottleFormView: View {
                     }
                 }
                 Section("Wine") {
-                    AutocompleteTextField(label: "Name", text: $name, suggestions: pastValues(\.name))
-                    AutocompleteTextField(label: "Producer", text: $producer, suggestions: pastValues(\.producer))
-                    Picker("Type", selection: $wineType) {
+                    AutocompleteTextField(label: "Producer (e.g. Stag’s Leap Wine Cellars)", text: $producer, suggestions: pastValues(\.producer))
+                    AutocompleteTextField(label: "Wine / Cuvée (e.g. CASK 23)", text: $name, suggestions: pastValues(\.name))
+                    AutocompleteTextField(label: "Varietal / Blend (e.g. Cabernet Sauvignon)", text: $varietal, suggestions: pastValues(\.varietal))
+                    Picker("Style", selection: $wineType) {
                         ForEach(WineType.allCases) { type in
                             Text(type.rawValue).tag(type)
                         }
                     }
-                    TextField("Vintage", text: $vintageText)
+                    TextField("Vintage (e.g. 2022)", text: $vintageText)
                         .keyboardType(.numberPad)
-                    AutocompleteTextField(label: "Region", text: $region, suggestions: pastValues(\.region))
+                }
+                Section("Origin") {
+                    AutocompleteTextField(label: "Country (e.g. United States)", text: $country, suggestions: pastValues(\.country))
+                    AutocompleteTextField(label: "Region (e.g. Napa Valley)", text: $region, suggestions: pastValues(\.region))
+                    AutocompleteTextField(label: "Appellation (e.g. Stags Leap District)", text: $appellation, suggestions: pastValues(\.appellation))
+                    AutocompleteTextField(label: "Vineyard (e.g. S.L.V. & FAY Vineyards)", text: $vineyard, suggestions: pastValues(\.vineyard))
+                    AutocompleteTextField(label: "Designation / Tier (e.g. Estate)", text: $designation, suggestions: pastValues(\.designation))
+                }
+                Section("Bottle") {
+                    Picker("Bottle Size", selection: $bottleSize) {
+                        ForEach(BottleSize.allCases) { size in
+                            Text(size.rawValue).tag(size)
+                        }
+                    }
+                    HStack {
+                        TextField("ABV (e.g. 14.8)", text: $abvText)
+                            .keyboardType(.decimalPad)
+                        Text("%")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Section("Notes") {
                     TextField("Notes", text: $notes, axis: .vertical)
@@ -148,12 +189,20 @@ struct BottleFormView: View {
 
     private func save() {
         let vintage = Int(vintageText)
+        let abv = Double(abvText)
         if let bottle = existingBottle {
             bottle.name = name
             bottle.producer = producer
             bottle.wineType = wineType
+            bottle.varietal = varietal
             bottle.vintage = vintage
+            bottle.country = country
             bottle.region = region
+            bottle.appellation = appellation
+            bottle.vineyard = vineyard
+            bottle.designation = designation
+            bottle.bottleSize = bottleSize
+            bottle.abv = abv
             bottle.notes = notes
             bottle.photoData = photoData
         } else {
@@ -161,8 +210,15 @@ struct BottleFormView: View {
                 name: name,
                 producer: producer,
                 wineType: wineType,
+                varietal: varietal,
                 vintage: vintage,
+                country: country,
                 region: region,
+                appellation: appellation,
+                vineyard: vineyard,
+                designation: designation,
+                bottleSize: bottleSize,
+                abv: abv,
                 notes: notes,
                 slot: slotForNewBottle,
                 photoData: photoData

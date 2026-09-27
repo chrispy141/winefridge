@@ -33,19 +33,44 @@ struct BottleDetailView: View {
                     }
                 }
                 Section("Wine") {
-                    LabeledContent("Name", value: bottle.name)
                     if !bottle.producer.isEmpty {
                         LabeledContent("Producer", value: bottle.producer)
                     }
-                    LabeledContent("Type", value: bottle.wineType.rawValue)
+                    LabeledContent("Wine / Cuvée", value: bottle.name)
+                    if !bottle.varietal.isEmpty {
+                        LabeledContent("Varietal / Blend", value: bottle.varietal)
+                    }
+                    LabeledContent("Style", value: bottle.wineType.rawValue)
                     if let vintage = bottle.vintage {
                         LabeledContent("Vintage", value: String(vintage))
                     }
-                    if !bottle.region.isEmpty {
-                        LabeledContent("Region", value: bottle.region)
-                    }
                     LabeledContent("Storage", value: storageName)
                     LabeledContent("Location", value: locationDescription)
+                }
+                if !bottle.country.isEmpty || !bottle.region.isEmpty || !bottle.appellation.isEmpty || !bottle.vineyard.isEmpty || !bottle.designation.isEmpty {
+                    Section("Origin") {
+                        if !bottle.country.isEmpty {
+                            LabeledContent("Country", value: bottle.country)
+                        }
+                        if !bottle.region.isEmpty {
+                            LabeledContent("Region", value: bottle.region)
+                        }
+                        if !bottle.appellation.isEmpty {
+                            LabeledContent("Appellation", value: bottle.appellation)
+                        }
+                        if !bottle.vineyard.isEmpty {
+                            LabeledContent("Vineyard", value: bottle.vineyard)
+                        }
+                        if !bottle.designation.isEmpty {
+                            LabeledContent("Designation / Tier", value: bottle.designation)
+                        }
+                    }
+                }
+                Section("Bottle") {
+                    LabeledContent("Bottle Size", value: bottle.bottleSize.rawValue)
+                    if let abv = bottle.abv {
+                        LabeledContent("ABV", value: "\(abv)%")
+                    }
                 }
                 if !bottle.notes.isEmpty {
                     Section("Notes") {
