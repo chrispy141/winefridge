@@ -50,7 +50,7 @@ struct QuickAddBottleView: View {
         case scanning
         case chooseAssignment(Bottle)
         case chooseLocation(Bottle)
-        case placed(Bottle, String)
+        case autoPlaced(Bottle, SlotID)
         case storageFull(Bottle)
         case pickAlternateStorage(Bottle)
     }
@@ -79,8 +79,8 @@ struct QuickAddBottleView: View {
                     StorageView(storage: locationStorage) { slot in
                         commitPlacement(bottle: bottle, slot: slot, inStorage: locationStorage)
                     }
-                case .placed(let bottle, let locationDescription):
-                    placedView(bottle: bottle, locationDescription: locationDescription)
+                case .autoPlaced(_, let slot):
+                    StorageView(storage: storage, highlightedSlot: slot)
                 case .storageFull(let bottle):
                     storageFullView(bottle: bottle)
                 case .pickAlternateStorage(let bottle):
@@ -141,7 +141,7 @@ struct QuickAddBottleView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Back") { phase = .chooseAssignment(bottle) }
             }
-        case .placed:
+        case .autoPlaced:
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }
             }
@@ -222,33 +222,6 @@ struct QuickAddBottleView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
             }
-            Spacer()
-        }
-        .padding()
-    }
-
-    private func placedView(bottle: Bottle, locationDescription: String) -> some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(.green)
-            Text("Bottle Added")
-                .font(.title2.bold())
-            VStack(spacing: 6) {
-                Text("Place this bottle in:")
-                    .foregroundStyle(.secondary)
-                Text(locationDescription)
-                    .font(.title3.bold())
-                    .multilineTextAlignment(.center)
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
-            Text(bottleSummary(bottle))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
             Spacer()
         }
         .padding()
@@ -345,7 +318,6 @@ struct QuickAddBottleView: View {
     /// `WinePlacementService`), falling back to the first available slot in
     /// natural order when there's no meaningful similarity signal.
     private func autoAssign(bottle: Bottle) {
-        let shelves = fetchShelves(for: storage)
         let bottles = fetchAllBottles()
         guard let recommendation = WinePlacementService.findBestSlot(
             for: bottle,
@@ -356,17 +328,18 @@ struct QuickAddBottleView: View {
             phase = .storageFull(bottle)
             return
         }
-        commitPlacement(bottle: bottle, slot: recommendation.slot, inStorage: storage, shelves: shelves)
-    }
-
-    private func commitPlacement(bottle: Bottle, slot: SlotID, inStorage storage: Storage) {
-        commitPlacement(bottle: bottle, slot: slot, inStorage: storage, shelves: fetchShelves(for: storage))
+        commitPlacement(bottle: bottle, slot: recommendation.slot, inStorage: storage, showsConfirmation: true)
     }
 
     /// Commits a bottle's placement after re-verifying, against a fresh
     /// fetch, that the slot is still empty — inventory may have changed
     /// since it was chosen, e.g. via iCloud sync from another device.
-    private func commitPlacement(bottle: Bottle, slot: SlotID, inStorage storage: Storage, shelves: [Shelf]) {
+    ///
+    /// Auto Assign picks a slot without the person ever seeing it, so it
+    /// shows `showsConfirmation`'s highlighted-slot review screen afterward;
+    /// choosing a location by hand is already visually confirmed by the tap
+    /// itself, so that path dismisses immediately.
+    private func commitPlacement(bottle: Bottle, slot: SlotID, inStorage storage: Storage, showsConfirmation: Bool = false) {
         let freshBottles = fetchAllBottles()
         guard StorageSlotAssigner.isAvailable(slot, occupying: freshBottles) else {
             errorAlert = QuickAddAlert(
@@ -377,21 +350,15 @@ struct QuickAddBottleView: View {
             return
         }
         bottle.slot = slot
-        let slotDescription = SlotID.locationDescription(for: slot, shelves: shelves)
-        phase = .placed(bottle, multilineLocation(storageName: storage.name, slotDescription: slotDescription))
+        if showsConfirmation {
+            phase = .autoPlaced(bottle, slot)
+        } else {
+            dismiss()
+        }
     }
 
     private func fetchAllBottles() -> [Bottle] {
         (try? modelContext.fetch(FetchDescriptor<Bottle>())) ?? []
-    }
-
-    private func fetchShelves(for storage: Storage) -> [Shelf] {
-        let storageID = storage.storageID
-        let descriptor = FetchDescriptor<Shelf>(
-            predicate: #Predicate { $0.storageID == storageID },
-            sortBy: [SortDescriptor(\.position)]
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     /// Every shelf across every storage unit — `WinePlacementService` needs
@@ -399,14 +366,6 @@ struct QuickAddBottleView: View {
     /// even though only `storage`'s own shelves are candidates for placement.
     private func fetchAllShelves() -> [Shelf] {
         (try? modelContext.fetch(FetchDescriptor<Shelf>())) ?? []
-    }
-
-    /// Formats a slot's location, storage name first, as separate lines so
-    /// it reads clearly at a glance while walking up to the physical
-    /// storage — reusing the same terminology `SlotID.locationDescription`
-    /// already produces, just laid out for prominence.
-    private func multilineLocation(storageName: String, slotDescription: String) -> String {
-        ([storageName] + slotDescription.split(separator: ", ").map(String.init)).joined(separator: "\n")
     }
 
     private func bottleSummary(_ bottle: Bottle) -> String {

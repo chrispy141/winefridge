@@ -19,21 +19,25 @@ struct StorageView: View {
     @State private var newBottleSlot: SlotID?
     @State private var isShowingEditStorage = false
     @State private var isShowingQuickAdd = false
-    @State private var pendingLocationSlot: SlotID?
     @AppStorage("bottleZoomLevel") private var zoomLevel: Double = 1.0
 
     private let zoomRange: ClosedRange<Double> = 0.6...1.8
     private let zoomStep: Double = 0.2
 
     /// When set, this view acts as Quick Add's "Choose Location" step:
-    /// occupied slots become unselectable, and tapping an empty slot (after
-    /// confirming) calls this instead of opening the normal add/detail
-    /// sheets. `nil` for ordinary browsing.
+    /// occupied slots become unselectable, and tapping an empty slot calls
+    /// this immediately instead of opening the normal add/detail sheets.
+    /// `nil` for ordinary browsing.
     var slotSelectionHandler: ((SlotID) -> Void)? = nil
 
-    init(storage: Storage, slotSelectionHandler: ((SlotID) -> Void)? = nil) {
+    /// The slot to highlight green, e.g. right after Quick Add's Auto Assign
+    /// places a bottle there. `nil` for ordinary browsing.
+    var highlightedSlot: SlotID? = nil
+
+    init(storage: Storage, slotSelectionHandler: ((SlotID) -> Void)? = nil, highlightedSlot: SlotID? = nil) {
         self.storage = storage
         self.slotSelectionHandler = slotSelectionHandler
+        self.highlightedSlot = highlightedSlot
         let storageID = storage.storageID
         _shelves = Query(filter: #Predicate<Shelf> { $0.storageID == storageID }, sort: \Shelf.position)
     }
@@ -51,23 +55,44 @@ struct StorageView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                VStack(spacing: 30) {
-                    ForEach(Array(shelves.enumerated()), id: \.element.persistentModelID) { index, shelf in
-                        ShelfView(
-                            shelf: shelf,
-                            shelfNumber: index + 1,
-                            bottlesBySlot: bottlesBySlot,
-                            availableWidth: geometry.size.width - 32,
-                            zoomLevel: zoomLevel,
-                            onSelectSlot: handleSelect,
-                            onMoveBottle: handleMove,
-                            selectedSlot: pendingLocationSlot
-                        )
+        ScrollViewReader { proxy in
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(spacing: 30) {
+                        ForEach(Array(shelves.enumerated()), id: \.element.persistentModelID) { index, shelf in
+                            ShelfView(
+                                shelf: shelf,
+                                shelfNumber: index + 1,
+                                bottlesBySlot: bottlesBySlot,
+                                availableWidth: geometry.size.width - 32,
+                                zoomLevel: zoomLevel,
+                                onSelectSlot: handleSelect,
+                                onMoveBottle: handleMove,
+                                highlightedSlot: highlightedSlot
+                            )
+                            // `highlightedSlot`'s own `.id` lives inside this
+                            // shelf's *horizontal* scroll view, so scrolling
+                            // to it can't bring the shelf itself into view in
+                            // the *outer* vertical one — this id, directly in
+                            // that outer scroll view, is what `scrollTo`
+                            // actually needs.
+                            .id(shelf.shelfID)
+                        }
                     }
+                    .padding()
                 }
-                .padding()
+            }
+            .task {
+                guard let shelfID = highlightedSlot?.shelfID else { return }
+                // The shelf grid hasn't finished laying out yet by the time
+                // this task starts, so an immediate scrollTo silently misses.
+                // Nudge it once right away, then again shortly after once
+                // layout has caught up.
+                proxy.scrollTo(shelfID, anchor: .center)
+                try? await Task.sleep(for: .milliseconds(300))
+                withAnimation {
+                    proxy.scrollTo(shelfID, anchor: .center)
+                }
             }
         }
         .navigationTitle(displayName)
@@ -120,32 +145,15 @@ struct StorageView: View {
                 Shelf.seedDefaults(in: modelContext, storageID: storage.storageID)
             }
         }
-        .confirmationDialog(
-            "Place Bottle Here?",
-            isPresented: Binding(
-                get: { pendingLocationSlot != nil },
-                set: { if !$0 { pendingLocationSlot = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingLocationSlot
-        ) { slot in
-            Button("Place Bottle Here") {
-                slotSelectionHandler?(slot)
-                pendingLocationSlot = nil
-            }
-            Button("Cancel", role: .cancel) { pendingLocationSlot = nil }
-        } message: { slot in
-            Text(SlotID.locationDescription(for: slot, shelves: shelves))
-        }
     }
 
     private func handleSelect(_ slot: SlotID) {
-        if slotSelectionHandler != nil {
+        if let slotSelectionHandler {
             // Quick Add's "Choose Location" step: occupied slots aren't
-            // selectable destinations, and empty ones need confirming
-            // before committing.
+            // selectable destinations. Tapping an empty one commits
+            // immediately.
             guard bottlesBySlot[slot] == nil else { return }
-            pendingLocationSlot = slot
+            slotSelectionHandler(slot)
             return
         }
         if let bottle = bottlesBySlot[slot] {

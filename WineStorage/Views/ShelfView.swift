@@ -19,9 +19,9 @@ struct ShelfView: View {
     let zoomLevel: CGFloat
     let onSelectSlot: (SlotID) -> Void
     let onMoveBottle: (SlotID, SlotID) -> Void
-    /// The slot currently pending confirmation, if any — see
-    /// `BottleSlotCellView.isSelected`.
-    var selectedSlot: SlotID? = nil
+    /// The slot to draw a green highlight border around, if any — see
+    /// `BottleSlotCellView.highlightColor`.
+    var highlightedSlot: SlotID? = nil
 
     private let spacing: CGFloat = 26
     private let containerPadding: CGFloat = 12
@@ -103,7 +103,8 @@ struct ShelfView: View {
 
     @ViewBuilder
     private func cell(for slot: SlotID) -> some View {
-        let base = BottleSlotCellView(bottle: bottlesBySlot[slot], size: cellSize, height: cellSize * 2, isSelected: slot == selectedSlot)
+        let base = BottleSlotCellView(bottle: bottlesBySlot[slot], size: cellSize, height: cellSize * 2, highlightColor: slot == highlightedSlot ? .green : nil)
+            .id(slot)
             .onTapGesture { onSelectSlot(slot) }
             .dropDestination(for: SlotID.self) { sourceSlots, _ in
                 guard let sourceSlot = sourceSlots.first else { return false }

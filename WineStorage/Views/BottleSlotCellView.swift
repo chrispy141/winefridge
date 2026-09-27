@@ -10,10 +10,10 @@ struct BottleSlotCellView: View {
     let bottle: Bottle?
     var size: CGFloat = 52
     var height: CGFloat?
-    /// Highlights this cell as the slot currently pending confirmation, e.g.
-    /// while Quick Add's "Choose Location" step is waiting on a placement to
-    /// be confirmed.
-    var isSelected: Bool = false
+    /// Draws a colored border around this cell plus an arrow pointing down at
+    /// it, e.g. to call out where Quick Add's Auto Assign just placed a
+    /// bottle. `nil` draws neither.
+    var highlightColor: Color? = nil
 
     private var photoImage: UIImage? {
         bottle?.photoData.flatMap(UIImage.init(data:))
@@ -32,9 +32,9 @@ struct BottleSlotCellView: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(photoImage != nil ? (bottle?.wineType.color ?? .clear) : .black.opacity(0.15), lineWidth: photoImage != nil ? 2 : 1)
 
-            if isSelected {
+            if let highlightColor {
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .strokeBorder(highlightColor, lineWidth: 3)
             }
 
             if let bottle {
@@ -64,6 +64,18 @@ struct BottleSlotCellView: View {
         }
         .frame(width: size, height: height ?? size)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .top) {
+            if let highlightColor {
+                // A colored border on the cell itself is easy to miss next to
+                // the wine-type-colored border every cell already has, so
+                // point an arrow down at it from just above instead.
+                Image(systemName: "arrowtriangle.down.fill")
+                    .font(.system(size: max(size * 0.4, 18)))
+                    .foregroundStyle(highlightColor)
+                    .offset(y: -max(size * 0.4, 18))
+                    .accessibilityHidden(true)
+            }
+        }
         .accessibilityLabel(bottle?.name ?? "Empty slot")
     }
 }
