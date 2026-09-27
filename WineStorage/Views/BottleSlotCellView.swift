@@ -15,11 +15,18 @@ struct BottleSlotCellView: View {
     /// bottle. `nil` draws neither.
     var highlightColor: Color? = nil
 
+    /// Downsampled directly from the stored photo data rather than a full
+    /// `UIImage(data:)` decode — cells are small, so decoding at full
+    /// resolution just to scale down for display wastes work on every
+    /// re-render of a shelf full of photographed bottles.
     private var photoImage: UIImage? {
-        bottle?.photoData.flatMap(UIImage.init(data:))
+        bottle?.photoData.flatMap { UIImage.thumbnail(from: $0, maxPixelSize: 400) }
     }
 
     var body: some View {
+        // Read once — `photoImage` decodes the photo, and this view reads it
+        // several times below.
+        let photoImage = photoImage
         ZStack {
             if let photoImage {
                 Image(uiImage: photoImage)

@@ -6,6 +6,7 @@
 import SwiftUI
 
 enum WineType: String, Codable, CaseIterable, Identifiable {
+    case unknown = "Unknown"
     case red = "Red"
     case white = "White"
     case rose = "Rosé"
@@ -17,6 +18,7 @@ enum WineType: String, Codable, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
+        case .unknown: return .gray
         case .red: return .red
         case .white: return .yellow
         case .rose: return .pink

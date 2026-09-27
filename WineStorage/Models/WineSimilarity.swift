@@ -91,9 +91,10 @@ enum WineSimilarity {
         addStringMatch(a.varietal, b.varietal, weight: Weights.varietal, label: "Same Grape/Blend")
         addStringMatch(a.designation, b.designation, weight: Weights.designation, label: "Same Designation")
 
-        // `wineType` is a non-optional enum (always has a value), so unlike
-        // the free-text fields above there's no "missing" case to skip.
-        if a.wineType == b.wineType {
+        // Unlike the free-text fields above, `wineType` is a non-optional
+        // enum — but its "Unknown" case plays the same role a blank string
+        // would, so two unknown-style bottles shouldn't count as a match.
+        if a.wineType == b.wineType && a.wineType != .unknown {
             score += Weights.wineType
             characteristics.append("Same Type: \(a.wineType.rawValue)")
         }

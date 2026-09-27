@@ -68,7 +68,7 @@ struct BottleFormView: View {
         self.onSave = onSave
         _name = State(initialValue: extraction?.wineName ?? "")
         _producer = State(initialValue: extraction?.producer ?? "")
-        _wineType = State(initialValue: extraction?.wineType ?? .red)
+        _wineType = State(initialValue: extraction?.wineType ?? .unknown)
         _varietal = State(initialValue: extraction?.varietal ?? "")
         // Positioned at the current year so someone adding a bottle doesn't
         // need to scroll the wheel from 1800; Unknown and NV are still just
@@ -153,20 +153,24 @@ struct BottleFormView: View {
                             Label(photoData == nil ? "Add Photo" : "Change Photo", systemImage: "photo.badge.plus")
                         }
                     }
-                    Button {
-                        startLabelScan()
-                    } label: {
-                        if isScanningLabel {
-                            Label {
-                                Text("Scanning Label…")
-                            } icon: {
-                                ProgressView()
-                            }
-                        } else {
-                            Label("Scan Wine Label", systemImage: "text.viewfinder")
-                        }
+                }
+                Section {
+                    HStack(spacing: 12) {
+                        scanButton(title: "Update Blanks", systemImage: "text.badge.plus", fillBlanksOnly: true)
+                        scanButton(title: "Update All", systemImage: "arrow.triangle.2.circlepath", fillBlanksOnly: false)
                     }
                     .disabled(isScanningLabel || photoData == nil)
+                    if isScanningLabel {
+                        HStack {
+                            ProgressView()
+                            Text("Scanning Label…")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Scan Wine Label")
+                } footer: {
+                    Text("Reads details from the photo above. “Update Blanks” only fills in empty fields; “Update All” replaces every recognized field.")
                 }
                 Section("Wine") {
                     AutocompleteTextField(title: "Producer", placeholder: "e.g. Stag’s Leap Wine Cellars", text: $producer, suggestions: pastValues(\.producer))
@@ -306,24 +310,39 @@ struct BottleFormView: View {
         photoData = uiImage.resized(maxDimension: 1000).jpegData(compressionQuality: 0.8)
     }
 
-    /// Starts the "Scan Wine Label" flow by running OCR on the bottle's
-    /// currently assigned photo. The button that triggers this is disabled
-    /// when there's no photo, so scanning never needs to ask for one.
-    private func startLabelScan() {
+    /// One of the two "Scan Wine Label" buttons — identical in every way
+    /// except which scan mode they start (see `apply(_:fillBlanksOnly:)`).
+    private func scanButton(title: String, systemImage: String, fillBlanksOnly: Bool) -> some View {
+        Button {
+            startLabelScan(fillBlanksOnly: fillBlanksOnly)
+        } label: {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+    }
+
+    /// Starts a "Scan Wine Label" flow by running OCR on the bottle's
+    /// currently assigned photo. Both scan buttons are disabled when there's
+    /// no photo, so scanning never needs to ask for one.
+    ///
+    /// - Parameter fillBlanksOnly: See `apply(_:fillBlanksOnly:)`.
+    private func startLabelScan(fillBlanksOnly: Bool) {
         guard let photoData, let image = UIImage(data: photoData) else { return }
-        runLabelScan(on: image)
+        runLabelScan(on: image, fillBlanksOnly: fillBlanksOnly)
     }
 
     /// Runs the on-device OCR + interpretation pipeline on a label photo and
-    /// applies the result to the form (see `apply(_:)` for the overwrite policy).
-    private func runLabelScan(on image: UIImage) {
+    /// applies the result to the form (see `apply(_:fillBlanksOnly:)` for the
+    /// overwrite policy).
+    private func runLabelScan(on image: UIImage, fillBlanksOnly: Bool) {
         isScanningLabel = true
         Task {
             defer { isScanningLabel = false }
             do {
                 switch try await WineLabelScanner.scan(image: image) {
                 case .extracted(let extraction):
-                    apply(extraction)
+                    apply(extraction, fillBlanksOnly: fillBlanksOnly)
                 case .interpreterUnavailable(let reason):
                     labelScanAlert = LabelScanAlert(
                         title: "Label Scanning Limited",
@@ -341,18 +360,15 @@ struct BottleFormView: View {
 
     /// Applies a label scan's results to the form.
     ///
-    /// When adding a new bottle, this only fills in fields still blank —
-    /// it never overwrites something already typed. When editing an
-    /// existing bottle, scanning is an explicit request to refresh that
-    /// bottle's details from the label, so recognized fields do overwrite
-    /// the current values. Either way, nothing is saved until the person
-    /// reviews the form and taps Save.
-    private func apply(_ extraction: WineLabelExtraction) {
-        let overwritesExistingValues = existingBottle != nil
-
+    /// - Parameter fillBlanksOnly: When `true` ("Update Blanks"), only fills
+    ///   in fields still blank — it never overwrites something already
+    ///   typed. When `false` ("Update All"), recognized fields overwrite
+    ///   whatever's currently there. Either way, nothing is saved until the
+    ///   person reviews the form and taps Save.
+    private func apply(_ extraction: WineLabelExtraction, fillBlanksOnly: Bool) {
         func apply(_ newValue: String?, to current: inout String) {
             guard let newValue else { return }
-            if overwritesExistingValues || current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if !fillBlanksOnly || current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 current = newValue
             }
         }
@@ -373,25 +389,25 @@ struct BottleFormView: View {
         // would fill in any other still-blank field.
         let untouchedNewBottleVintage = Bottle.VintageSelection.year(Self.currentYear)
         if let isNonVintage = extraction.isNonVintage, isNonVintage {
-            if overwritesExistingValues || vintageSelection == untouchedNewBottleVintage {
+            if !fillBlanksOnly || vintageSelection == untouchedNewBottleVintage {
                 vintageSelection = .nonVintage
             }
         } else if let vintage = extraction.vintage {
-            if overwritesExistingValues || vintageSelection == untouchedNewBottleVintage {
+            if !fillBlanksOnly || vintageSelection == untouchedNewBottleVintage {
                 vintageSelection = .year(vintage)
             }
         }
-        if let abv = extraction.abv, overwritesExistingValues || abvText.isEmpty {
+        if let abv = extraction.abv, !fillBlanksOnly || abvText.isEmpty {
             abvText = String(abv)
         }
-        // `wineType` and `bottleSize` have no "blank" state of their own —
-        // when adding a bottle their current values are still the form's
-        // defaults until someone picks otherwise, and when editing,
-        // overwriting them is exactly what a rescan is for.
-        if let wineType = extraction.wineType {
+        // `wineType`'s "Unknown" case is its blank state, same as an empty
+        // string for the text fields above. `bottleSize` has no such case,
+        // so "Update Blanks" leaves it untouched entirely — there's nothing
+        // for it to consider blank — while "Update All" always overwrites it.
+        if let wineType = extraction.wineType, !fillBlanksOnly || self.wineType == .unknown {
             self.wineType = wineType
         }
-        if let bottleSize = extraction.bottleSize {
+        if let bottleSize = extraction.bottleSize, !fillBlanksOnly {
             self.bottleSize = bottleSize
         }
     }

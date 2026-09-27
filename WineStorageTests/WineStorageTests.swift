@@ -72,7 +72,7 @@ final class PersistenceTests: XCTestCase {
         let saved = fetched[0]
         XCTAssertEqual(saved.name, "Barolo")
         XCTAssertEqual(saved.producer, "")
-        XCTAssertEqual(saved.wineType, .red)
+        XCTAssertEqual(saved.wineType, .unknown)
         XCTAssertNil(saved.vintage)
         XCTAssertEqual(saved.region, "")
         XCTAssertEqual(saved.notes, "")

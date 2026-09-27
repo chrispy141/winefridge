@@ -15,7 +15,7 @@ final class Bottle {
     /// within a producer's lineup. The one required field.
     var name: String = ""
     var producer: String = ""
-    var wineType: WineType = WineType.red
+    var wineType: WineType = WineType.unknown
     var varietal: String = ""
     var vintage: Int?
     /// Whether this bottle is a deliberately non-vintage ("NV") wine, as
@@ -44,7 +44,7 @@ final class Bottle {
     init(
         name: String,
         producer: String = "",
-        wineType: WineType = .red,
+        wineType: WineType = .unknown,
         varietal: String = "",
         vintage: Int? = nil,
         isNonVintage: Bool = false,

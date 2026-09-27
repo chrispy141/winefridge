@@ -55,6 +55,11 @@ struct StorageView: View {
     }
 
     var body: some View {
+        // Computed once per body evaluation rather than read directly inside
+        // the `ForEach` below — `bottlesBySlot` rebuilds a dictionary from
+        // every bottle in the app, and reading the property from inside the
+        // loop re-ran that rebuild once per shelf.
+        let bottlesBySlot = bottlesBySlot
         ScrollViewReader { proxy in
             GeometryReader { geometry in
                 ScrollView {
