@@ -37,6 +37,8 @@ struct BottleFormView: View {
     @State private var designation: String
     @State private var bottleSize: BottleSize
     @State private var abvText: String
+    @State private var drinkWindowStartText: String
+    @State private var drinkWindowEndText: String
     @State private var notes: String
     @State private var photoData: Data?
     @State private var photosPickerItem: PhotosPickerItem?
@@ -88,6 +90,8 @@ struct BottleFormView: View {
         _designation = State(initialValue: extraction?.designation ?? "")
         _bottleSize = State(initialValue: extraction?.bottleSize ?? .standard)
         _abvText = State(initialValue: extraction?.abv.map { String($0) } ?? "")
+        _drinkWindowStartText = State(initialValue: "")
+        _drinkWindowEndText = State(initialValue: "")
         _notes = State(initialValue: "")
         _photoData = State(initialValue: initialPhotoData)
     }
@@ -108,6 +112,8 @@ struct BottleFormView: View {
         _designation = State(initialValue: bottle.designation)
         _bottleSize = State(initialValue: bottle.bottleSize)
         _abvText = State(initialValue: bottle.abv.map { String($0) } ?? "")
+        _drinkWindowStartText = State(initialValue: bottle.drinkWindowStartYear.map { String($0) } ?? "")
+        _drinkWindowEndText = State(initialValue: bottle.drinkWindowEndYear.map { String($0) } ?? "")
         _notes = State(initialValue: bottle.notes)
         _photoData = State(initialValue: bottle.photoData)
     }
@@ -218,6 +224,28 @@ struct BottleFormView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                }
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Drink From")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TextField("e.g. 2026", text: $drinkWindowStartText)
+                                .keyboardType(.numberPad)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Drink By")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TextField("e.g. 2032", text: $drinkWindowEndText)
+                                .keyboardType(.numberPad)
+                        }
+                    }
+                } header: {
+                    Text("Drinking Window")
+                } footer: {
+                    Text("Either year can be left blank, such as to note only when the wine starts or stops being ideal to drink.")
                 }
                 Section("Notes") {
                     VStack(alignment: .leading, spacing: 2) {
@@ -414,6 +442,8 @@ struct BottleFormView: View {
 
     private func save() {
         let abv = Double(abvText)
+        let drinkWindowStartYear = Int(drinkWindowStartText)
+        let drinkWindowEndYear = Int(drinkWindowEndText)
         let savedBottle: Bottle
         if let bottle = existingBottle {
             bottle.name = name
@@ -428,6 +458,8 @@ struct BottleFormView: View {
             bottle.designation = designation
             bottle.bottleSize = bottleSize
             bottle.abv = abv
+            bottle.drinkWindowStartYear = drinkWindowStartYear
+            bottle.drinkWindowEndYear = drinkWindowEndYear
             bottle.notes = notes
             bottle.photoData = photoData
             savedBottle = bottle
@@ -444,6 +476,8 @@ struct BottleFormView: View {
                 designation: designation,
                 bottleSize: bottleSize,
                 abv: abv,
+                drinkWindowStartYear: drinkWindowStartYear,
+                drinkWindowEndYear: drinkWindowEndYear,
                 notes: notes,
                 slot: slotForNewBottle,
                 photoData: photoData

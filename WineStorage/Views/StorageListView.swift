@@ -28,33 +28,46 @@ struct StorageListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    HStack(spacing: 16) {
-                        Spacer()
-                        ForEach(row) { storage in
-                            NavigationLink {
-                                StorageView(storage: storage)
-                            } label: {
-                                StorageGridItem(storage: storage)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button("Delete", systemImage: "trash", role: .destructive) {
-                                    storagePendingDeletion = storage
+        VStack(spacing: 0) {
+            HStack {
+                Image("EmblemText")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 72)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            ScrollView {
+                VStack(spacing: 20) {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                        HStack(spacing: 16) {
+                            Spacer()
+                            ForEach(row) { storage in
+                                NavigationLink {
+                                    StorageView(storage: storage)
+                                } label: {
+                                    StorageGridItem(storage: storage)
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button("Delete", systemImage: "trash", role: .destructive) {
+                                        storagePendingDeletion = storage
+                                    }
                                 }
                             }
+                            Spacer()
                         }
-                        Spacer()
                     }
                 }
+                .frame(maxWidth: .infinity)
+                .padding()
             }
-            .frame(maxWidth: .infinity)
-            .padding()
         }
-        .navigationTitle("Wine Storage")
-        .navigationBarTitleDisplayMode(.large)
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 12)
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

@@ -71,6 +71,9 @@ struct BottleDetailView: View {
                     if let abv = bottle.abv {
                         LabeledContent("ABV", value: "\(abv)%")
                     }
+                    if let drinkWindowDisplayText = bottle.drinkWindowDisplayText {
+                        LabeledContent("Drinking Window", value: drinkWindowDisplayText)
+                    }
                 }
                 if !bottle.notes.isEmpty {
                     Section("Notes") {

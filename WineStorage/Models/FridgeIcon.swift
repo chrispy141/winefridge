@@ -6,17 +6,17 @@
 enum FridgeIcon: String, Codable, CaseIterable, Identifiable {
     case small = "FridgeIconSmall"
     case tall = "FridgeIconTall"
-    case shelfOne = "ShelfIconOne"
-    case shelfTwo = "ShelfIconTwo"
+    case shelfSmall = "SmallShelfIcon"
+    case shelfLarge = "LargeShelfIcon"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .small: return "Small Fridge"
-        case .tall: return "Tall Fridge"
-        case .shelfOne: return "Cellar Shelf 1"
-        case .shelfTwo: return "Cellar Shelf 2"
+        case .tall: return "Large Fridge"
+        case .shelfSmall: return "Small Shelf"
+        case .shelfLarge: return "Large Shelf"
         }
     }
 

@@ -56,6 +56,10 @@ struct BackupPackage: Codable {
         var designation: String?
         var bottleSize: BottleSize?
         var abv: Double?
+        /// Optional (rather than defaulted) so backups made before this field
+        /// existed still decode; `restore` treats a missing value as `nil`.
+        var drinkWindowStartYear: Int?
+        var drinkWindowEndYear: Int?
         var notes: String
         var dateAdded: Date
         var slot: SlotID?
@@ -90,6 +94,8 @@ struct BackupPackage: Codable {
                 designation: $0.designation,
                 bottleSize: $0.bottleSize,
                 abv: $0.abv,
+                drinkWindowStartYear: $0.drinkWindowStartYear,
+                drinkWindowEndYear: $0.drinkWindowEndYear,
                 notes: $0.notes,
                 dateAdded: $0.dateAdded,
                 slot: $0.slot,
@@ -150,6 +156,8 @@ struct BackupPackage: Codable {
                 designation: record.designation ?? "",
                 bottleSize: record.bottleSize ?? .standard,
                 abv: record.abv,
+                drinkWindowStartYear: record.drinkWindowStartYear,
+                drinkWindowEndYear: record.drinkWindowEndYear,
                 notes: record.notes,
                 dateAdded: record.dateAdded,
                 slot: record.slot,

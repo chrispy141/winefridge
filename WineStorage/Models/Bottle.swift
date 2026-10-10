@@ -29,6 +29,11 @@ final class Bottle {
     var designation: String = ""
     var bottleSize: BottleSize = BottleSize.standard
     var abv: Double?
+    /// The ideal drinking window, as calendar years (e.g. 2026–2032). Either
+    /// bound may be set without the other (e.g. "drink after 2028" or "drink
+    /// before 2030").
+    var drinkWindowStartYear: Int?
+    var drinkWindowEndYear: Int?
     var notes: String = ""
     var dateAdded: Date = Date.now
     @Attribute(.externalStorage) var photoData: Data?
@@ -55,6 +60,8 @@ final class Bottle {
         designation: String = "",
         bottleSize: BottleSize = .standard,
         abv: Double? = nil,
+        drinkWindowStartYear: Int? = nil,
+        drinkWindowEndYear: Int? = nil,
         notes: String = "",
         dateAdded: Date = .now,
         slot: SlotID? = nil,
@@ -73,6 +80,8 @@ final class Bottle {
         self.designation = designation
         self.bottleSize = bottleSize
         self.abv = abv
+        self.drinkWindowStartYear = drinkWindowStartYear
+        self.drinkWindowEndYear = drinkWindowEndYear
         self.notes = notes
         self.dateAdded = dateAdded
         self.shelfID = slot?.shelfID
@@ -142,6 +151,17 @@ final class Bottle {
         case .unknown: return nil
         case .nonVintage: return "NV"
         case .year(let year): return String(year)
+        }
+    }
+
+    /// A short label for displaying the drinking window, or `nil` when
+    /// neither bound is set.
+    var drinkWindowDisplayText: String? {
+        switch (drinkWindowStartYear, drinkWindowEndYear) {
+        case (nil, nil): return nil
+        case (let start?, let end?): return "\(start)–\(end)"
+        case (let start?, nil): return "\(start)+"
+        case (nil, let end?): return "Through \(end)"
         }
     }
 }

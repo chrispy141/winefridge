@@ -26,23 +26,46 @@ struct InventoryListView: View {
     }
 
     var body: some View {
-        List {
-            ForEach(filteredBottles) { bottle in
-                Button {
-                    selectedBottle = bottle
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        BottleRowLabel(bottle: bottle)
-                        Text(locationDescription(for: bottle))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            HStack {
+                Image("EmblemText")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 72)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            List {
+                ForEach(filteredBottles) { bottle in
+                    Button {
+                        selectedBottle = bottle
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            BottleRowLabel(bottle: bottle)
+                            Text(locationDescription(for: bottle))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .onDelete(perform: delete)
             }
-            .onDelete(perform: delete)
+            .searchable(text: $searchText, prompt: "Search bottles")
+            .overlay {
+                if bottles.isEmpty {
+                    ContentUnavailableView(
+                        "No Bottles Yet",
+                        systemImage: "wineglass",
+                        description: Text("Tap + to add a bottle.")
+                    )
+                }
+            }
         }
-        .searchable(text: $searchText, prompt: "Search bottles")
-        .navigationTitle("Inventory")
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 12)
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -50,15 +73,6 @@ struct InventoryListView: View {
                 } label: {
                     Label("Add Bottle", systemImage: "plus")
                 }
-            }
-        }
-        .overlay {
-            if bottles.isEmpty {
-                ContentUnavailableView(
-                    "No Bottles Yet",
-                    systemImage: "wineglass",
-                    description: Text("Tap + to add a bottle.")
-                )
             }
         }
         .sheet(item: $selectedBottle) { bottle in
