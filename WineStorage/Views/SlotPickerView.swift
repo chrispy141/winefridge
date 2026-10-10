@@ -82,8 +82,13 @@ struct BottleRowLabel: View {
                     .frame(width: 12, height: 12)
             }
             VStack(alignment: .leading) {
-                Text(bottle.name)
-                    .foregroundStyle(.primary)
+                HStack(spacing: 4) {
+                    if let vintageDisplayText = bottle.vintageDisplayText {
+                        Text(vintageDisplayText)
+                    }
+                    Text(bottle.name)
+                }
+                .foregroundStyle(.primary)
                 if !bottle.producer.isEmpty {
                     Text(bottle.producer)
                         .font(.caption)
@@ -91,10 +96,6 @@ struct BottleRowLabel: View {
                 }
             }
             Spacer()
-            if let vintageDisplayText = bottle.vintageDisplayText {
-                Text(vintageDisplayText)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 }

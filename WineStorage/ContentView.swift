@@ -26,13 +26,6 @@ struct ContentView: View {
             .tabItem {
                 Label("Inventory", systemImage: "list.bullet")
             }
-
-            NavigationStack {
-                DrinkingWindowView()
-            }
-            .tabItem {
-                Label("Cellar Clock", systemImage: "hourglass")
-            }
         }
         .overlay(alignment: .bottomTrailing) {
             Button {

@@ -45,7 +45,15 @@ struct BottleDetailView: View {
                         LabeledContent("Vintage", value: vintageDisplayText)
                     }
                     LabeledContent("Storage", value: storageName)
-                    LabeledContent("Location", value: locationDescription)
+                    if let placedStorage, let slot = bottle.slot {
+                        NavigationLink {
+                            StorageView(storage: placedStorage, highlightedSlot: slot)
+                        } label: {
+                            LabeledContent("Location", value: locationDescription)
+                        }
+                    } else {
+                        LabeledContent("Location", value: locationDescription)
+                    }
                 }
                 if !bottle.country.isEmpty || !bottle.region.isEmpty || !bottle.appellation.isEmpty || !bottle.vineyard.isEmpty || !bottle.designation.isEmpty {
                     Section("Origin") {
@@ -115,9 +123,14 @@ struct BottleDetailView: View {
         return shelves.first(where: { $0.shelfID == slot.shelfID })
     }
 
+    private var placedStorage: Storage? {
+        guard let placedShelf else { return nil }
+        return storages.first(where: { $0.storageID == placedShelf.storageID })
+    }
+
     private var storageName: String {
-        guard let placedShelf else { return "Unassigned" }
-        return storages.first(where: { $0.storageID == placedShelf.storageID })?.name ?? "Wine Storage"
+        guard placedShelf != nil else { return "Unassigned" }
+        return placedStorage?.name ?? "Wine Storage"
     }
 
     private var locationDescription: String {

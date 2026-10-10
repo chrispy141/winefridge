@@ -15,6 +15,23 @@ struct InventoryListView: View {
     @State private var searchText = ""
     @State private var selectedBottle: Bottle?
     @State private var isAddingBottle = false
+    @State private var outlookYears: Int
+
+    /// Years-from-now options offered in the outlook selector, in 5-year
+    /// increments out to four decades.
+    private static let outlookOptions = Array(stride(from: 5, through: 40, by: 5))
+
+    init() {
+        _outlookYears = State(initialValue: 10)
+    }
+
+    private var currentYear: Int {
+        Calendar.current.component(.year, from: .now)
+    }
+
+    private var timelineHorizonYear: Int {
+        currentYear + outlookYears
+    }
 
     private var filteredBottles: [Bottle] {
         guard !searchText.isEmpty else { return bottles }
@@ -37,16 +54,34 @@ struct InventoryListView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
+            HStack(spacing: 4) {
+                Spacer()
+                Text("Outlook")
+                    .foregroundStyle(.secondary)
+                Picker("Outlook", selection: $outlookYears) {
+                    ForEach(Self.outlookOptions, id: \.self) { years in
+                        Text("+\(years) years").tag(years)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.wheel)
+                .frame(width: 130, height: 80)
+                .clipped()
+            }
+            .padding(.horizontal)
+            .padding(.top, 4)
+
             List {
                 ForEach(filteredBottles) { bottle in
                     Button {
                         selectedBottle = bottle
                     } label: {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 4) {
                             BottleRowLabel(bottle: bottle)
                             Text(locationDescription(for: bottle))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            DrinkWindowTimelineView(bottle: bottle, horizonYear: timelineHorizonYear)
                         }
                     }
                 }
