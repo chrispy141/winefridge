@@ -73,7 +73,8 @@ struct StorageView: View {
                                 zoomLevel: zoomLevel,
                                 onSelectSlot: handleSelect,
                                 onMoveBottle: handleMove,
-                                highlightedSlot: highlightedSlot
+                                highlightedSlot: highlightedSlot,
+                                showsWineTypeBorders: storage.showsWineTypeBorders
                             )
                             // `highlightedSlot`'s own `.id` lives inside this
                             // shelf's *horizontal* scroll view, so scrolling

@@ -23,16 +23,22 @@ final class Storage {
     /// default for custom enum attributes, so a missing value must decode to
     /// `nil` rather than force-cast into a non-optional `FridgeIcon`.
     var icon: FridgeIcon?
+    /// Whether bottle slots on this storage unit's shelves draw a thin
+    /// border colored by wine style (red, white, etc.). Defaulted so
+    /// SwiftData can lightweight-migrate stores predating this field —
+    /// borders were always shown before it existed.
+    var showsWineTypeBorders: Bool = true
 
     /// The icon to display — falls back to `.tall` for storage units created
     /// before this field existed.
     var displayIcon: FridgeIcon { icon ?? .tall }
 
-    init(name: String, position: Int, icon: FridgeIcon = .tall, dateCreated: Date = .now) {
+    init(name: String, position: Int, icon: FridgeIcon = .tall, showsWineTypeBorders: Bool = true, dateCreated: Date = .now) {
         self.name = name
         self.position = position
         self.dateCreated = dateCreated
         self.storageID = UUID()
         self.icon = icon
+        self.showsWineTypeBorders = showsWineTypeBorders
     }
 }

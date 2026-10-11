@@ -45,6 +45,20 @@ struct BottleFormView: View {
     @State private var isShowingCamera = false
     @State private var isShowingPhotoPicker = false
 
+    /// A transparent-background cutout of just the bottle, generated
+    /// on-device from `photoData` (see `BottleCutoutService`) for display in
+    /// storage-box slots. Regenerated whenever `photoData` changes;
+    /// `cutoutGenerationID` guards against a stale regeneration overwriting
+    /// a newer one if photos are swapped in quick succession.
+    @State private var cutoutPhotoData: Data?
+    @State private var isGeneratingCutout = false
+    @State private var cutoutGenerationID = UUID()
+    /// Set right before assigning `photoData` when the new value already
+    /// has its background removed (the camera does this itself — see
+    /// `CameraCaptureView`), so the `onChange(of: photoData)` below skips
+    /// redoing the same Vision pass a second time.
+    @State private var skipNextCutoutRegeneration = false
+
     @State private var isScanningLabel = false
     @State private var labelScanAlert: LabelScanAlert?
 
@@ -54,6 +68,9 @@ struct BottleFormView: View {
     ///     the bottle itself once a location has been chosen).
     ///   - initialPhotoData: A label photo to start the form with, such as
     ///     the photo Quick Add just scanned.
+    ///   - initialCutoutPhotoData: The already-generated background-removed
+    ///     cutout for `initialPhotoData`, if Quick Add's camera capture
+    ///     already produced one — avoids redoing that Vision pass here.
     ///   - extraction: Recognized label fields (see `WineLabelScanner`) to
     ///     pre-populate the form with. Every field is still editable before
     ///     saving — nothing here is committed until the person taps Save.
@@ -62,6 +79,7 @@ struct BottleFormView: View {
     init(
         newBottleSlot slot: SlotID? = nil,
         initialPhotoData: Data? = nil,
+        initialCutoutPhotoData: Data? = nil,
         prefilledExtraction extraction: WineLabelExtraction? = nil,
         onSave: ((Bottle) -> Void)? = nil
     ) {
@@ -94,6 +112,7 @@ struct BottleFormView: View {
         _drinkWindowEndText = State(initialValue: "")
         _notes = State(initialValue: "")
         _photoData = State(initialValue: initialPhotoData)
+        _cutoutPhotoData = State(initialValue: initialCutoutPhotoData)
     }
 
     init(editing bottle: Bottle) {
@@ -116,6 +135,7 @@ struct BottleFormView: View {
         _drinkWindowEndText = State(initialValue: bottle.drinkWindowEndYear.map { String($0) } ?? "")
         _notes = State(initialValue: bottle.notes)
         _photoData = State(initialValue: bottle.photoData)
+        _cutoutPhotoData = State(initialValue: bottle.cutoutPhotoData)
     }
 
     var body: some View {
@@ -135,6 +155,13 @@ struct BottleFormView: View {
                         Button("Remove Photo", role: .destructive) {
                             photoData = nil
                             photosPickerItem = nil
+                        }
+                    }
+                    if isGeneratingCutout {
+                        HStack {
+                            ProgressView()
+                            Text("Isolating bottle for storage view…")
+                                .foregroundStyle(.secondary)
                         }
                     }
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
@@ -264,20 +291,35 @@ struct BottleFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGeneratingCutout)
+                }
+            }
+            .task {
+                // Covers bottles that already have a photo but no cutout yet
+                // — either a fresh Quick Add photo, or an existing bottle
+                // photographed before this feature existed.
+                if photoData != nil && cutoutPhotoData == nil {
+                    regenerateCutout(from: photoData)
                 }
             }
             .onChange(of: photosPickerItem) { _, newItem in
                 Task {
-                    guard let data = try? await newItem?.loadTransferable(type: Data.self) else { return }
-                    store(imageData: data)
+                    guard let data = try? await newItem?.loadTransferable(type: Data.self), let uiImage = UIImage(data: data) else { return }
+                    store(image: uiImage)
                 }
+            }
+            .onChange(of: photoData) { _, newPhotoData in
+                if skipNextCutoutRegeneration {
+                    skipNextCutoutRegeneration = false
+                    return
+                }
+                regenerateCutout(from: newPhotoData)
             }
             .photosPicker(isPresented: $isShowingPhotoPicker, selection: $photosPickerItem, matching: .images)
             .fullScreenCover(isPresented: $isShowingCamera) {
-                CameraCaptureView { image in
+                CameraCaptureView { image, backgroundRemoved in
                     if let image {
-                        store(imageData: image.jpegData(compressionQuality: 0.9))
+                        store(image: image, isAlreadyCutout: backgroundRemoved)
                     }
                     isShowingCamera = false
                 }
@@ -333,9 +375,47 @@ struct BottleFormView: View {
         return result.sorted()
     }
 
-    private func store(imageData: Data?) {
-        guard let imageData, let uiImage = UIImage(data: imageData) else { return }
-        photoData = uiImage.resized(maxDimension: 1000).jpegData(compressionQuality: 0.8)
+    /// Resizes and stores `image` as the bottle's photo.
+    ///
+    /// - Parameter isAlreadyCutout: `true` when `image` already has its
+    ///   background removed (the camera does this itself before handing the
+    ///   photo back — see `CameraCaptureView`). In that case, `image` is
+    ///   stored as PNG to preserve its transparency, and `cutoutPhotoData`
+    ///   is set directly from it rather than running Vision on it again.
+    private func store(image: UIImage, isAlreadyCutout: Bool = false) {
+        let resized = image.resized(maxDimension: 1000)
+        if isAlreadyCutout {
+            let data = resized.pngData()
+            cutoutGenerationID = UUID()
+            cutoutPhotoData = data
+            isGeneratingCutout = false
+            skipNextCutoutRegeneration = true
+            photoData = data
+        } else {
+            photoData = resized.jpegData(compressionQuality: 0.8)
+        }
+    }
+
+    /// Regenerates `cutoutPhotoData` on-device from `data` (see
+    /// `BottleCutoutService`), or clears it immediately when `data` is
+    /// `nil`. `cutoutGenerationID` makes sure that if the photo changes
+    /// again before this finishes, the stale result is discarded instead of
+    /// overwriting the newer one.
+    private func regenerateCutout(from data: Data?) {
+        cutoutPhotoData = nil
+        let generationID = UUID()
+        cutoutGenerationID = generationID
+        guard let data, let image = UIImage(data: data) else {
+            isGeneratingCutout = false
+            return
+        }
+        isGeneratingCutout = true
+        Task {
+            let result = try? await BottleCutoutService.generateCutout(from: image)
+            guard cutoutGenerationID == generationID else { return }
+            cutoutPhotoData = result
+            isGeneratingCutout = false
+        }
     }
 
     /// One of the two "Scan Wine Label" buttons — identical in every way
@@ -462,6 +542,7 @@ struct BottleFormView: View {
             bottle.drinkWindowEndYear = drinkWindowEndYear
             bottle.notes = notes
             bottle.photoData = photoData
+            bottle.cutoutPhotoData = cutoutPhotoData
             savedBottle = bottle
         } else {
             let bottle = Bottle(
@@ -480,7 +561,8 @@ struct BottleFormView: View {
                 drinkWindowEndYear: drinkWindowEndYear,
                 notes: notes,
                 slot: slotForNewBottle,
-                photoData: photoData
+                photoData: photoData,
+                cutoutPhotoData: cutoutPhotoData
             )
             bottle.vintageSelection = vintageSelection
             modelContext.insert(bottle)

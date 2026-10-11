@@ -14,22 +14,48 @@ struct BottleSlotCellView: View {
     /// it, e.g. to call out where Quick Add's Auto Assign just placed a
     /// bottle. `nil` draws neither.
     var highlightColor: Color? = nil
+    /// Whether a cell showing a photo draws its border colored by wine
+    /// style (red, white, etc.) rather than a plain neutral one — see
+    /// `Storage.showsWineTypeBorders`.
+    var showsWineTypeBorder: Bool = true
 
-    /// Downsampled directly from the stored photo data rather than a full
-    /// `UIImage(data:)` decode — cells are small, so decoding at full
-    /// resolution just to scale down for display wastes work on every
-    /// re-render of a shelf full of photographed bottles.
-    private var photoImage: UIImage? {
+    /// A transparent-background cutout of just the bottle (see
+    /// `BottleCutoutService`), downsampled directly from the stored data
+    /// rather than a full `UIImage(data:)` decode — cells are small, so
+    /// decoding at full resolution just to scale down for display wastes
+    /// work on every re-render of a shelf full of photographed bottles.
+    /// Preferred over `fullPhotoImage` whenever it's available, since it
+    /// shows just the bottle rather than its photographed surroundings.
+    private var cutoutImage: UIImage? {
+        bottle?.cutoutPhotoData.flatMap { UIImage.thumbnail(from: $0, maxPixelSize: 400) }
+    }
+
+    /// The bottle's full, uncropped photo, downsampled the same way as
+    /// `cutoutImage`. Shown only when no cutout is available — e.g. the
+    /// cutout hasn't finished generating yet, or Vision couldn't isolate a
+    /// subject in the photo.
+    private var fullPhotoImage: UIImage? {
         bottle?.photoData.flatMap { UIImage.thumbnail(from: $0, maxPixelSize: 400) }
     }
 
     var body: some View {
-        // Read once — `photoImage` decodes the photo, and this view reads it
-        // several times below.
-        let photoImage = photoImage
+        // Read once — these decode the stored photo data, and this view
+        // reads the results several times below.
+        let cutoutImage = cutoutImage
+        let fullPhotoImage = cutoutImage == nil ? fullPhotoImage : nil
+        let hasImage = cutoutImage != nil || fullPhotoImage != nil
+        let showsColoredBorder = hasImage && showsWineTypeBorder
         ZStack {
-            if let photoImage {
-                Image(uiImage: photoImage)
+            // A cutout's background is deliberately left blank/see-through
+            // — no fill behind it — so only the bottle itself shows, inside
+            // the cell's border.
+            if let cutoutImage {
+                Image(uiImage: cutoutImage)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.1)
+            } else if let fullPhotoImage {
+                Image(uiImage: fullPhotoImage)
                     .resizable()
                     .scaledToFill()
             } else {
@@ -37,7 +63,7 @@ struct BottleSlotCellView: View {
                     .fill(bottle?.wineType.color.gradient ?? Color(.tertiarySystemFill).gradient)
             }
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(photoImage != nil ? (bottle?.wineType.color ?? .clear) : .black.opacity(0.15), lineWidth: photoImage != nil ? 2 : 1)
+                .strokeBorder(showsColoredBorder ? (bottle?.wineType.color ?? .clear) : .black.opacity(0.15), lineWidth: showsColoredBorder ? 2 : 1)
 
             if let highlightColor {
                 RoundedRectangle(cornerRadius: 8)
@@ -46,7 +72,7 @@ struct BottleSlotCellView: View {
 
             if let bottle {
                 let vintageText = Text(bottle.vintageDisplayText ?? "")
-                if photoImage != nil {
+                if hasImage {
                     VStack {
                         Spacer()
                         vintageText

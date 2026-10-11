@@ -37,6 +37,13 @@ final class Bottle {
     var notes: String = ""
     var dateAdded: Date = Date.now
     @Attribute(.externalStorage) var photoData: Data?
+    /// A transparent-background cutout of just the bottle from `photoData`,
+    /// produced on-device by `BottleCutoutService`. Used in place of the
+    /// full photo when showing this bottle in a storage-box slot, so only
+    /// the bottle's silhouette appears rather than its photographed
+    /// background. `nil` until generated, or if Vision couldn't isolate a
+    /// subject in the photo — callers should fall back to `photoData`.
+    @Attribute(.externalStorage) var cutoutPhotoData: Data?
 
     private var shelfID: UUID?
     private var row: Int?
@@ -65,7 +72,8 @@ final class Bottle {
         notes: String = "",
         dateAdded: Date = .now,
         slot: SlotID? = nil,
-        photoData: Data? = nil
+        photoData: Data? = nil,
+        cutoutPhotoData: Data? = nil
     ) {
         self.name = name
         self.producer = producer
@@ -88,6 +96,7 @@ final class Bottle {
         self.row = slot?.row
         self.column = slot?.column
         self.photoData = photoData
+        self.cutoutPhotoData = cutoutPhotoData
     }
 
     /// The slot this bottle currently occupies, or `nil` if it hasn't been placed on a shelf.

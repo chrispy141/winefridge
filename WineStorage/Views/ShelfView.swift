@@ -22,6 +22,9 @@ struct ShelfView: View {
     /// The slot to draw a green highlight border around, if any — see
     /// `BottleSlotCellView.highlightColor`.
     var highlightedSlot: SlotID? = nil
+    /// Whether cells draw a thin wine-style-colored border — see
+    /// `Storage.showsWineTypeBorders`.
+    var showsWineTypeBorders: Bool = true
 
     private let spacing: CGFloat = 26
     private let containerPadding: CGFloat = 12
@@ -103,7 +106,7 @@ struct ShelfView: View {
 
     @ViewBuilder
     private func cell(for slot: SlotID) -> some View {
-        let base = BottleSlotCellView(bottle: bottlesBySlot[slot], size: cellSize, height: cellSize * 2, highlightColor: slot == highlightedSlot ? .green : nil)
+        let base = BottleSlotCellView(bottle: bottlesBySlot[slot], size: cellSize, height: cellSize * 2, highlightColor: slot == highlightedSlot ? .green : nil, showsWineTypeBorder: showsWineTypeBorders)
             .id(slot)
             .onTapGesture { onSelectSlot(slot) }
             .dropDestination(for: SlotID.self) { sourceSlots, _ in

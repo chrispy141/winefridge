@@ -41,6 +41,12 @@ struct EditStorageView: View {
                     }
                 }
 
+                Section {
+                    Toggle("Wine Type Borders", isOn: $storage.showsWineTypeBorders)
+                } footer: {
+                    Text("Draws a thin border around each bottle colored by its wine style (red, white, etc).")
+                }
+
                 ForEach(Array(shelves.enumerated()), id: \.element.persistentModelID) { index, shelf in
                     ShelfEditRow(
                         shelf: shelf,

@@ -58,6 +58,9 @@ struct QuickAddBottleView: View {
     private struct ReviewContext: Identifiable {
         let id = UUID()
         let photoData: Data?
+        /// The already-generated background-removed cutout for `photoData`,
+        /// when the camera produced one — see `beginScan(on:isAlreadyCutout:)`.
+        let cutoutPhotoData: Data?
         let extraction: WineLabelExtraction?
     }
 
@@ -100,10 +103,10 @@ struct QuickAddBottleView: View {
         }
         .photosPicker(isPresented: $isShowingPhotoPicker, selection: $photosPickerItem, matching: .images)
         .fullScreenCover(isPresented: $isShowingCamera) {
-            CameraCaptureView { image in
+            CameraCaptureView { image, backgroundRemoved in
                 isShowingCamera = false
                 if let image {
-                    beginScan(on: image)
+                    beginScan(on: image, isAlreadyCutout: backgroundRemoved)
                 }
             }
             .ignoresSafeArea()
@@ -111,6 +114,7 @@ struct QuickAddBottleView: View {
         .sheet(item: $reviewContext, onDismiss: reviewDismissed) { context in
             BottleFormView(
                 initialPhotoData: context.photoData,
+                initialCutoutPhotoData: context.cutoutPhotoData,
                 prefilledExtraction: context.extraction,
                 onSave: { bottle in
                     didProduceBottleFromReview = true
@@ -282,7 +286,13 @@ struct QuickAddBottleView: View {
     /// hands off to the existing Add/Edit Bottle form for review — pre-filled
     /// with whatever was recognized, even if that's incomplete or nothing at
     /// all, so a poor scan never blocks the person from continuing by hand.
-    private func beginScan(on image: UIImage) {
+    ///
+    /// - Parameter isAlreadyCutout: `true` when `image` already has its
+    ///   background removed (the camera does this itself — see
+    ///   `CameraCaptureView`). Stored as PNG to preserve the transparency,
+    ///   and reused as the review form's starting cutout rather than having
+    ///   it run Vision on the same photo again.
+    private func beginScan(on image: UIImage, isAlreadyCutout: Bool = false) {
         phase = .scanning
         Task {
             var extraction: WineLabelExtraction?
@@ -299,8 +309,13 @@ struct QuickAddBottleView: View {
                     message: "Try a clearer, well-lit photo with the text facing the camera. You can still fill in the details by hand."
                 )
             }
-            let photoData = image.resized(maxDimension: 1000).jpegData(compressionQuality: 0.8)
-            reviewContext = ReviewContext(photoData: photoData, extraction: extraction)
+            let resized = image.resized(maxDimension: 1000)
+            let photoData = isAlreadyCutout ? resized.pngData() : resized.jpegData(compressionQuality: 0.8)
+            reviewContext = ReviewContext(
+                photoData: photoData,
+                cutoutPhotoData: isAlreadyCutout ? photoData : nil,
+                extraction: extraction
+            )
         }
     }
 

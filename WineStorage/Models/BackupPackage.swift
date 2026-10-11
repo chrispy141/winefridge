@@ -24,6 +24,10 @@ struct BackupPackage: Codable {
         var position: Int
         var dateCreated: Date
         var icon: FridgeIcon?
+        /// Optional (rather than defaulted) so backups made before this
+        /// field existed still decode; `restore` treats a missing value as
+        /// `true`, matching borders always having been shown before it.
+        var showsWineTypeBorders: Bool?
     }
 
     struct ShelfRecord: Codable {
@@ -64,6 +68,10 @@ struct BackupPackage: Codable {
         var dateAdded: Date
         var slot: SlotID?
         var photoData: Data?
+        /// Optional (rather than defaulted) so backups made before this field
+        /// existed still decode; `restore` treats a missing value as `nil`,
+        /// same as a bottle whose cutout hasn't been generated yet.
+        var cutoutPhotoData: Data?
     }
 
     var createdDate: Date
@@ -74,7 +82,7 @@ struct BackupPackage: Codable {
     init(modelContext: ModelContext) throws {
         createdDate = .now
         storages = try modelContext.fetch(FetchDescriptor<Storage>()).map {
-            StorageRecord(storageID: $0.storageID, name: $0.name, position: $0.position, dateCreated: $0.dateCreated, icon: $0.icon)
+            StorageRecord(storageID: $0.storageID, name: $0.name, position: $0.position, dateCreated: $0.dateCreated, icon: $0.icon, showsWineTypeBorders: $0.showsWineTypeBorders)
         }
         shelves = try modelContext.fetch(FetchDescriptor<Shelf>()).map {
             ShelfRecord(shelfID: $0.shelfID, storageID: $0.storageID, position: $0.position, rowSlotCounts: $0.rowSlotCounts, isOffsetRows: $0.isOffsetRows)
@@ -99,7 +107,8 @@ struct BackupPackage: Codable {
                 notes: $0.notes,
                 dateAdded: $0.dateAdded,
                 slot: $0.slot,
-                photoData: $0.photoData
+                photoData: $0.photoData,
+                cutoutPhotoData: $0.cutoutPhotoData
             )
         }
     }
@@ -134,6 +143,7 @@ struct BackupPackage: Codable {
             let storage = Storage(name: record.name, position: record.position, dateCreated: record.dateCreated)
             storage.storageID = record.storageID
             storage.icon = record.icon
+            storage.showsWineTypeBorders = record.showsWineTypeBorders ?? true
             modelContext.insert(storage)
         }
         for record in shelves {
@@ -161,7 +171,8 @@ struct BackupPackage: Codable {
                 notes: record.notes,
                 dateAdded: record.dateAdded,
                 slot: record.slot,
-                photoData: record.photoData
+                photoData: record.photoData,
+                cutoutPhotoData: record.cutoutPhotoData
             )
             modelContext.insert(bottle)
         }
