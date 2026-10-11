@@ -82,6 +82,19 @@ struct BottleDetailView: View {
                     if let drinkWindowDisplayText = bottle.drinkWindowDisplayText {
                         LabeledContent("Drinking Window", value: drinkWindowDisplayText)
                     }
+                    if let maturityStage {
+                        LabeledContent("Maturity") {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(maturityStage.color)
+                                    .frame(width: 10, height: 10)
+                                Text(maturityStage.label)
+                            }
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Maturity")
+                        .accessibilityValue(maturityStage.accessibilityDescription)
+                    }
                 }
                 if !bottle.notes.isEmpty {
                     Section("Notes") {
@@ -114,6 +127,14 @@ struct BottleDetailView: View {
                 BottleFormView(editing: bottle)
             }
         }
+    }
+
+    private var maturityStage: WineMaturityStage? {
+        WineMaturity.stage(
+            start: bottle.drinkWindowStartYear,
+            end: bottle.drinkWindowEndYear,
+            asOf: Calendar.current.component(.year, from: .now)
+        )
     }
 
     /// A bottle has no storage unit of its own — its storage unit (if any) is

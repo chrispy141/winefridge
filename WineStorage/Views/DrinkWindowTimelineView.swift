@@ -8,47 +8,53 @@ import SwiftUI
 /// A compact horizontal timeline for a bottle's drinking window, shown inline
 /// in the inventory list. Every bottle shares the same timeline domain — the
 /// left edge is always today, and the right edge is `horizonYear` (chosen
-/// once, above the whole list), so bars are directly comparable. The bar is
-/// a stoplight: red outside the window, smoothly shifting through yellow as
-/// it ramps up or down, and solid green at peak drinking (see `intensity`).
-/// Bottles whose window has already closed are shown as a solid red bar
-/// instead, signaling it's overdue.
+/// once, above the whole list), so bars are directly comparable. Color shows
+/// where the wine sits in its aging lifecycle (see `WineMaturity`/
+/// `WineMaturityStage` and `DrinkWindowLegendView` for the on-screen key);
+/// opacity separately shows how intensely that stage reads — low at the
+/// edges, full at peak — independent of which color is showing.
 struct DrinkWindowTimelineView: View {
     let bottle: Bottle
     let horizonYear: Int
 
     private static let height: CGFloat = 6
     /// Number of gradient stops sampled across the visible domain to
-    /// approximate the smoothstep curve from `intensity`.
+    /// approximate the smoothstep curve from `WineMaturity`.
     private static let sampleCount = 24
+    /// The floor opacity at the ramp edges (and for an overdue bottle's
+    /// solid bar, which this formula also naturally produces — see
+    /// `gradientStops`) — also used by `DrinkWindowLegendView` so swatches
+    /// for stages only ever seen at this floor match the bar exactly.
+    static let floorOpacity: Double = 0.92
 
     private var currentYear: Int {
         Calendar.current.component(.year, from: .now)
     }
 
-    private var isOverdue: Bool {
-        guard let end = bottle.drinkWindowEndYear else { return false }
-        return end < currentYear
+    /// The bottle's maturity stage as of today — used for the bar's
+    /// accessibility label, since the gradient itself can't be read aloud.
+    private var currentStage: WineMaturityStage? {
+        WineMaturity.stage(start: bottle.drinkWindowStartYear, end: bottle.drinkWindowEndYear, asOf: currentYear)
     }
 
     var body: some View {
-        if isOverdue {
-            Capsule()
-                .fill(Color.red.opacity(0.85))
-                .frame(height: Self.height)
-        } else if let stops = gradientStops {
+        if let stops = gradientStops {
             Capsule()
                 .fill(LinearGradient(stops: stops, startPoint: .leading, endPoint: .trailing))
                 .frame(height: Self.height)
+                .accessibilityLabel(currentStage?.accessibilityDescription ?? "")
         }
     }
 
-    /// Builds the stoplight gradient for the bar over the fixed
-    /// `[today, horizonYear]` domain by sampling `intensity` at evenly spaced
-    /// years, or `nil` when there's no window to show. A missing start is
-    /// treated as "ready as of today"; a missing end has no real fade-out
-    /// point, so the ramp is given a nominal span to climb across and then
-    /// held at its peak (via a running maximum) instead of fading back down.
+    /// Builds the maturity gradient for the bar over the fixed
+    /// `[today, horizonYear]` domain by sampling `WineMaturity` at evenly
+    /// spaced years, or `nil` when there's no window to show. A missing
+    /// start is treated as "ready as of today"; a missing end has no real
+    /// fade-out point, so `holdAtPeak` keeps the ramp from ever reading as
+    /// declining once it reaches peak. A bottle whose window closed before
+    /// today naturally renders as a solid `.pastPeak` bar at the floor
+    /// opacity, since every sampled year across the visible domain falls
+    /// after its ramp-out completes — no separate "overdue" case needed.
     private var gradientStops: [Gradient.Stop]? {
         let start = bottle.drinkWindowStartYear
         let end = bottle.drinkWindowEndYear
@@ -62,57 +68,97 @@ struct DrinkWindowTimelineView: View {
 
         let span = domainEnd - domainStart
 
-        var runningPeak = 0.0
         return (0...Self.sampleCount).map { index in
             let location = Double(index) / Double(Self.sampleCount)
             let year = domainStart + location * span
-            var intensity = Self.intensity(year: year, startYear: startYear, endYear: endYear)
-            if holdAtPeak {
-                runningPeak = max(runningPeak, intensity)
-                intensity = runningPeak
+            let phase = WineMaturity.phase(year: year, startYear: startYear, endYear: endYear, holdAtPeak: holdAtPeak)
+            let intensity = WineMaturity.intensity(fadeIn: phase.fadeIn, fadeOut: phase.fadeOut)
+            let opacity = Self.floorOpacity + (1 - Self.floorOpacity) * intensity
+            let color = WineMaturity.color(fadeIn: phase.fadeIn, fadeOut: phase.fadeOut)
+            return Gradient.Stop(color: color.opacity(opacity), location: location)
+        }
+    }
+}
+
+/// The on-screen key for `DrinkWindowTimelineView`'s maturity colors.
+/// Wraps into two rows of two so it still fits beside the Outlook picker.
+struct DrinkWindowLegendView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                item(.developing)
+                item(.approachingPeak)
             }
-            let opacity = 0.15 + 0.85 * intensity
-            return Gradient.Stop(color: Self.stoplightColor(intensity: intensity).opacity(opacity), location: location)
+            HStack(spacing: 10) {
+                item(.atPeak)
+                item(.pastPeak)
+            }
         }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
     }
 
-    /// How "in the zone" a given year is: 0 outside the window, ramping up
-    /// to 1 by 35% into the window, holding until 70%, then easing back
-    /// down to 0 by `endYear`.
-    private static func intensity(
-        year: Double,
-        startYear: Double,
-        endYear: Double
-    ) -> Double {
-        let duration = max(1, endYear - startYear)
-        let progress = (year - startYear) / duration
-
-        func smoothstep(_ t: Double) -> Double {
-            let x = min(1, max(0, t))
-            return x * x * (3 - 2 * x)
+    private func item(_ stage: WineMaturityStage) -> some View {
+        // `.developing` and `.pastPeak` are only ever seen in the bars at
+        // the intensity floor, so they're flattened to match exactly (see
+        // `WineMaturity.flattened`); `.approachingPeak`/`.atPeak` are shown
+        // at their full, undiminished color.
+        let color: Color = switch stage {
+        case .developing, .pastPeak:
+            WineMaturity.flattened(stage.color, opacity: DrinkWindowTimelineView.floorOpacity)
+        case .approachingPeak, .atPeak:
+            stage.color
         }
+        return HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+            Text(stage.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+}
 
-        let fadeIn = smoothstep(progress / 0.35)
-        let fadeOut = smoothstep((1.0 - progress) / 0.30)
+/// A shared year axis drawn above a list of `DrinkWindowTimelineView` bars,
+/// so every bar's `[startYear, endYear]` domain has on-screen context without
+/// repeating labels on every row. Draws a labeled tick at every 5-year
+/// increment between the two endpoints, which are always ticks themselves.
+/// Relies on every tick year being the same digit count so evenly spacing
+/// the ticks with `Spacer()` lines them up with the years they're under.
+struct DrinkWindowAxisView: View {
+    let startYear: Int
+    let endYear: Int
 
-        return min(fadeIn, fadeOut)
+    private var tickYears: [Int] {
+        guard endYear > startYear else { return [startYear] }
+        return Array(stride(from: startYear, through: endYear, by: 5))
     }
 
-    /// Maps 0...1 to a stoplight hue: red at 0, yellow at 0.5, green at 1,
-    /// interpolated smoothly and continuously in RGB space.
-    private static func stoplightColor(intensity: Double) -> Color {
-        let t = min(max(intensity, 0), 1)
-        if t < 0.5 {
-            return Color(red: 1.0, green: t / 0.5, blue: 0.0)
-        } else {
-            return Color(red: 1.0 - (t - 0.5) / 0.5, green: 1.0, blue: 0.0)
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(tickYears.enumerated()), id: \.element) { index, year in
+                if index > 0 {
+                    Spacer()
+                }
+                VStack(spacing: 2) {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.6))
+                        .frame(width: 1, height: 8)
+                    Text(String(year))
+                }
+            }
         }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
     }
 }
 
 #Preview {
     let currentYear = Calendar.current.component(.year, from: .now)
     return VStack(alignment: .leading, spacing: 16) {
+        DrinkWindowLegendView()
+        DrinkWindowAxisView(startYear: currentYear, endYear: currentYear + 10)
         DrinkWindowTimelineView(bottle: Bottle(name: "Both bounds", wineType: .red, drinkWindowStartYear: currentYear + 2, drinkWindowEndYear: currentYear + 8), horizonYear: currentYear + 10)
         DrinkWindowTimelineView(bottle: Bottle(name: "Open-ended", wineType: .white, drinkWindowStartYear: currentYear + 1, drinkWindowEndYear: nil), horizonYear: currentYear + 10)
         DrinkWindowTimelineView(bottle: Bottle(name: "No start", wineType: .rose, drinkWindowStartYear: nil, drinkWindowEndYear: currentYear + 5), horizonYear: currentYear + 10)

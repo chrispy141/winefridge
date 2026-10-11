@@ -54,10 +54,10 @@ struct InventoryListView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
-            HStack(spacing: 4) {
+            HStack(spacing: 12) {
+                DrinkWindowLegendView()
+                    .layoutPriority(1)
                 Spacer()
-                Text("Outlook")
-                    .foregroundStyle(.secondary)
                 Picker("Outlook", selection: $outlookYears) {
                     ForEach(Self.outlookOptions, id: \.self) { years in
                         Text("+\(years) years").tag(years)
@@ -70,6 +70,10 @@ struct InventoryListView: View {
             }
             .padding(.horizontal)
             .padding(.top, 4)
+
+            DrinkWindowAxisView(startYear: currentYear, endYear: timelineHorizonYear)
+                .padding(.horizontal)
+                .padding(.top, 8)
 
             List {
                 ForEach(filteredBottles) { bottle in

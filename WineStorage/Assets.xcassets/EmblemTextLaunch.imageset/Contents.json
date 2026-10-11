@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "EmblemText1x.png",
+      "filename" : "EmblemTextPhone1x.png",
       "idiom" : "iphone",
       "scale" : "1x"
     },
     {
-      "filename" : "EmblemText2x.png",
+      "filename" : "EmblemTextPhone2x.png",
       "idiom" : "iphone",
       "scale" : "2x"
     },
     {
-      "filename" : "EmblemText3x.png",
+      "filename" : "EmblemTextPhone3x.png",
       "idiom" : "iphone",
       "scale" : "3x"
     },
